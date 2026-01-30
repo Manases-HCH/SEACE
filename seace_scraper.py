@@ -13,7 +13,6 @@ from selenium.webdriver.common.by import By
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -32,32 +31,38 @@ class SeaceScraperCompleto:
         
         options = Options()
         
-        # Modo headless (sin ventana visible)
-        if self.headless:
-            options.add_argument('--headless=new')
-            logger.info("   👻 Modo invisible activado")
+        # CRITICAL: Opciones obligatorias para Cloud Run
+        options.add_argument('--headless=new')
+        options.add_argument('--no-sandbox')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-software-rasterizer')
+        options.add_argument('--disable-extensions')
         
-        # Optimizaciones generales
+        # Optimizaciones
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_argument('--window-size=1920,1080')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
-        # Optimizaciones adicionales para headless
-        if self.headless:
-            options.add_argument('--disable-gpu')  # No usar GPU
-            options.add_argument('--no-sandbox')  # Más estable
-            options.add_argument('--disable-dev-shm-usage')  # Evita problemas de memoria
-            options.add_argument('--disable-extensions')  # Sin extensiones
-            
-            # Desactivar carga de imágenes (MÁS RÁPIDO)
-            prefs = {
-                "profile.managed_default_content_settings.images": 2,  # No cargar imágenes
-                "profile.default_content_setting_values.notifications": 2  # Bloquear notificaciones
-            }
-            options.add_experimental_option("prefs", prefs)
+        # Desactivar carga de imágenes
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.notifications": 2
+        }
+        options.add_experimental_option("prefs", prefs)
         
-        service = Service(ChromeDriverManager().install())
-        self.driver = webdriver.Chrome(service=service, options=options)
+        # IMPORTANT: Usar Chrome del sistema (no ChromeDriverManager)
+        try:
+            # Intentar sin service (chromedriver en PATH)
+            self.driver = webdriver.Chrome(options=options)
+            logger.info("✅ Chrome iniciado desde PATH")
+        except Exception as e:
+            logger.info(f"⚠️ Intentando con ruta explícita: {e}")
+            # Fallback: ruta explícita
+            service = Service('/usr/local/bin/chromedriver')
+            self.driver = webdriver.Chrome(service=service, options=options)
+            logger.info("✅ Chrome iniciado con ruta explícita")
+        
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
         logger.info("✅ Navegador iniciado\n")
     
