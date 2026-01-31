@@ -79,17 +79,17 @@ def scrape():
         # Ordenar columnas
         columnas_orden = [
             'N°',
-            'Fecha y Hora de Publicacion',
-            'Nombre o Sigla de la Entidad',
-            'Descripción de Objeto',
+            'Fecha',
+            'Entidad Solicitante',
+            'Descripción del Requerimiento',
             'Nomenclatura',
-            'Objeto de Contratación',
+            'Objeto',
             'Region',
-            'VR / VE / Cuantía de la contratación',
+            'Valor Referencial',
             'Moneda',
-            'Codigo CUBSO',
-            'Fecha Inicio',
-            'Fecha Fin'
+            'CUBSO',
+            'Fecha de Inicio',
+            'Fecha de Fin'
         ]
         
         columnas_existentes = [col for col in columnas_orden if col in df.columns]
