@@ -528,17 +528,17 @@ class SeaceScraperCompleto:
             # Ordenar columnas
             columnas_orden = [
                 'N°',
-                'Nombre o Sigla de la Entidad',
                 'Fecha y Hora de Publicacion',
+                'Nombre o Sigla de la Entidad',
+                'Descripción de Objeto',
                 'Nomenclatura',
                 'Objeto de Contratación',
-                'Descripción de Objeto',
+                'Region',
                 'VR / VE / Cuantía de la contratación',
                 'Moneda',
+                'Codigo CUBSO',
                 'Fecha Inicio',
-                'Fecha Fin',
-                'Region',
-                'Codigo CUBSO'
+                'Fecha Fin'
             ]
             
             # Reordenar si existen todas las columnas
