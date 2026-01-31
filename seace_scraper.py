@@ -510,7 +510,7 @@ class SeaceScraperCompleto:
         except:
             return 0
     
-    def guardar_excel(self, fecha_inicio: datetime, nombre_archivo: str = None):
+def guardar_excel(self, fecha_inicio: datetime, nombre_archivo: str = None):
     """Guarda los resultados en Excel"""
     if not self.resultados:
         logger.warning("⚠️  No hay datos para guardar")
