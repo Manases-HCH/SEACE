@@ -249,6 +249,7 @@ class SeaceScraperCompleto:
                     
                     # Extraer datos básicos usando el texto ya obtenido
                     datos_basicos = {
+                        'N°': texto_celdas[0] if len(texto_celdas) > 0 else '',
                         'Nombre o Sigla de la Entidad': texto_celdas[1] if len(texto_celdas) > 1 else '',
                         'Fecha y Hora de Publicacion': texto_celdas[2] if len(texto_celdas) > 2 else '',
                         'Nomenclatura': texto_celdas[3] if len(texto_celdas) > 3 else '',
@@ -263,7 +264,7 @@ class SeaceScraperCompleto:
                         idx_fila += 1
                         continue
                     
-                    logger.info(f"      → Procesando fila {idx_fila + 1}/{total_filas}: {datos_basicos['Nomenclatura']}")
+                    logger.info(f"      → Procesando fila {idx_fila + 1}/{total_filas}: N°{datos_basicos['N°']} - {datos_basicos['Nomenclatura']}")
                     
                     # Buscar el botón de ficha en esta fila
                     try:
@@ -526,6 +527,7 @@ class SeaceScraperCompleto:
             
             # Ordenar columnas
             columnas_orden = [
+                'N°',
                 'Nombre o Sigla de la Entidad',
                 'Fecha y Hora de Publicacion',
                 'Nomenclatura',
