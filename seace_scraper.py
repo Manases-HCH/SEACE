@@ -260,7 +260,7 @@ class SeaceScraperCompleto:
                     }
                     
                     # Verificar que no esté vacío
-                    if not datos_basicos['Nombre o Sigla de la Entidad']:
+                    if not datos_basicos['Entidad Solicitante']:
                         idx_fila += 1
                         continue
                     
@@ -402,7 +402,7 @@ class SeaceScraperCompleto:
                         By.XPATH,
                         '//span[contains(text(), "Codigo CUBSO:")]/parent::td/following-sibling::td'
                     )
-                    datos['Codigo CUBSO'] = cubso_cell.text.strip()
+                    datos['CUBSO'] = cubso_cell.text.strip()
                     logger.info(f"            ✓ {datos['CUBSO']}")
                     
                 except NoSuchElementException:
