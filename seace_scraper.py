@@ -510,40 +510,45 @@ class SeaceScraperCompleto:
         except:
             return 0
     
-    def guardar_excel(self, nombre_archivo: str = "licitaciones_seace_completo.xlsx"):
-        """Guarda los resultados en Excel"""
-        if not self.resultados:
-            logger.warning("⚠️  No hay datos para guardar")
-            return False
+    def guardar_excel(self, fecha_inicio: datetime, nombre_archivo: str = None):
+    """Guarda los resultados en Excel"""
+    if not self.resultados:
+        logger.warning("⚠️  No hay datos para guardar")
+        return False
+    
+    try:
+        # Generar nombre con formato LICIT_PROD2_(AAMMDD).xlsx
+        if nombre_archivo is None:
+            fecha_formato = fecha_inicio.strftime('%y%m%d')  # AAMMDD
+            nombre_archivo = f"LICIT_PROD2_{fecha_formato}.xlsx"
         
-        try:
-            df = pd.DataFrame(self.resultados)
-            
-            # Ordenar columnas
-            columnas_orden = [
-                'Nombre o Sigla de la Entidad',
-                'Fecha y Hora de Publicacion',
-                'Nomenclatura',
-                'Objeto de Contratación',
-                'Descripción de Objeto',
-                'VR / VE / Cuantía de la contratación',
-                'Moneda',
-                'Fecha Inicio',
-                'Fecha Fin',
-                'Region',
-                'Codigo CUBSO'
-            ]
-            
-            # Reordenar si existen todas las columnas
-            columnas_existentes = [col for col in columnas_orden if col in df.columns]
-            df = df[columnas_existentes]
-            
-            df.to_excel(nombre_archivo, index=False, engine='openpyxl')
-            logger.info(f"💾 Archivo guardado: {nombre_archivo}")
-            return True
-        except Exception as e:
-            logger.error(f"❌ Error guardando archivo: {e}")
-            return False
+        df = pd.DataFrame(self.resultados)
+        
+        # Ordenar columnas
+        columnas_orden = [
+            'Nombre o Sigla de la Entidad',
+            'Fecha y Hora de Publicacion',
+            'Nomenclatura',
+            'Objeto de Contratación',
+            'Descripción de Objeto',
+            'VR / VE / Cuantía de la contratación',
+            'Moneda',
+            'Fecha Inicio',
+            'Fecha Fin',
+            'Region',
+            'Codigo CUBSO'
+        ]
+        
+        # Reordenar si existen todas las columnas
+        columnas_existentes = [col for col in columnas_orden if col in df.columns]
+        df = df[columnas_existentes]
+        
+        df.to_excel(nombre_archivo, index=False, engine='openpyxl')
+        logger.info(f"💾 Archivo guardado: {nombre_archivo}")
+        return nombre_archivo  # Retornar el nombre del archivo
+    except Exception as e:
+        logger.error(f"❌ Error guardando archivo: {e}")
+        return False
 
 
 def pedir_fecha(texto: str) -> datetime:
@@ -624,7 +629,7 @@ def main():
         exito = scraper.buscar_y_extraer(fecha_inicio, fecha_fin)
         
         if exito:
-            scraper.guardar_excel(nombre_archivo)
+            scraper.guardar_excel(fecha_inicio)
         
         logger.info("⏳ Esperando antes de cerrar...")
         sleep(5)
