@@ -78,6 +78,7 @@ def scrape():
         
         # Ordenar columnas
         columnas_orden = [
+            'N°',
             'Nombre o Sigla de la Entidad',
             'Fecha y Hora de Publicacion',
             'Nomenclatura',
