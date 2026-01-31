@@ -250,12 +250,12 @@ class SeaceScraperCompleto:
                     # Extraer datos básicos usando el texto ya obtenido
                     datos_basicos = {
                         'N°': texto_celdas[0] if len(texto_celdas) > 0 else '',
-                        'Nombre o Sigla de la Entidad': texto_celdas[1] if len(texto_celdas) > 1 else '',
-                        'Fecha y Hora de Publicacion': texto_celdas[2] if len(texto_celdas) > 2 else '',
+                        'Entidad Solicitante': texto_celdas[1] if len(texto_celdas) > 1 else '',
+                        'Fecha': texto_celdas[2] if len(texto_celdas) > 2 else '',
                         'Nomenclatura': texto_celdas[3] if len(texto_celdas) > 3 else '',
-                        'Objeto de Contratación': texto_celdas[5] if len(texto_celdas) > 5 else '',
-                        'Descripción de Objeto': texto_celdas[6] if len(texto_celdas) > 6 else '',
-                        'VR / VE / Cuantía de la contratación': texto_celdas[9] if len(texto_celdas) > 9 else '',
+                        'Objeto': texto_celdas[5] if len(texto_celdas) > 5 else '',
+                        'Descripción del Requerimiento': texto_celdas[6] if len(texto_celdas) > 6 else '',
+                        'Valor Referencial': texto_celdas[9] if len(texto_celdas) > 9 else '',
                         'Moneda': texto_celdas[10] if len(texto_celdas) > 10 else ''
                     }
                     
@@ -312,10 +312,10 @@ class SeaceScraperCompleto:
                         # Si no se puede entrar a la ficha, guardar solo datos básicos
                         datos_completos = {
                             **datos_basicos,
-                            'Fecha Inicio': '',
-                            'Fecha Fin': '',
+                            'Fecha de Inicio': '',
+                            'Fecha de Fin': '',
                             'Region': '',
-                            'Codigo CUBSO': ''
+                            'CUBSO': ''
                         }
                         self.resultados.append(datos_completos)
                         registros_extraidos += 1
@@ -342,10 +342,10 @@ class SeaceScraperCompleto:
     def extraer_datos_ficha(self) -> dict:
         """Extrae los datos adicionales de la ficha de selección - OPTIMIZADO"""
         datos = {
-            'Fecha Inicio': '',
-            'Fecha Fin': '',
+            'Fecha de Inicio': '',
+            'Fecha de Fin': '',
             'Region': '',
-            'Codigo CUBSO': ''
+            'CUBSO': ''
         }
         
         try:
@@ -359,9 +359,9 @@ class SeaceScraperCompleto:
                 celdas_cronograma = primera_fila_cronograma.find_elements(By.TAG_NAME, "td")
                 
                 if len(celdas_cronograma) >= 3:
-                    datos['Fecha Inicio'] = celdas_cronograma[1].text.strip()
-                    datos['Fecha Fin'] = celdas_cronograma[2].text.strip()
-                    logger.info(f"            ✓ {datos['Fecha Inicio']} - {datos['Fecha Fin']}")
+                    datos['Fecha de Inicio'] = celdas_cronograma[1].text.strip()
+                    datos['Fecha de Fin'] = celdas_cronograma[2].text.strip()
+                    logger.info(f"            ✓ {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
                     
             except (NoSuchElementException, TimeoutException):
                 logger.warning("            ⚠️  Sin cronograma")
@@ -403,7 +403,7 @@ class SeaceScraperCompleto:
                         '//span[contains(text(), "Codigo CUBSO:")]/parent::td/following-sibling::td'
                     )
                     datos['Codigo CUBSO'] = cubso_cell.text.strip()
-                    logger.info(f"            ✓ {datos['Codigo CUBSO']}")
+                    logger.info(f"            ✓ {datos['CUBSO']}")
                     
                 except NoSuchElementException:
                     logger.warning("            ⚠️  Sin CUBSO")
@@ -528,17 +528,17 @@ class SeaceScraperCompleto:
             # Ordenar columnas
             columnas_orden = [
                 'N°',
-                'Fecha y Hora de Publicacion',
-                'Nombre o Sigla de la Entidad',
-                'Descripción de Objeto',
+                'Fecha',
+                'Entidad Solicitante',
+                'Descripción del Requerimiento',
                 'Nomenclatura',
-                'Objeto de Contratación',
+                'Objeto',
                 'Region',
-                'VR / VE / Cuantía de la contratación',
+                'Valor Referencial',
                 'Moneda',
-                'Codigo CUBSO',
-                'Fecha Inicio',
-                'Fecha Fin'
+                'CUBSO',
+                'Fecha de Inicio',
+                'Fecha de Fin'
             ]
             
             # Reordenar si existen todas las columnas
