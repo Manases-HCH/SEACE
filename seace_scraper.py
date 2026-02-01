@@ -351,20 +351,37 @@ class SeaceScraperCompleto:
         try:
             # 1. Extraer Fecha Inicio y Fecha Fin del cronograma
             logger.info("         📅 Extrayendo fechas...")
+            # Intentar primero "Registro de participantes"
             try:
-                primera_fila_cronograma = WebDriverWait(self.driver, 3).until(
+                fila_registro = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.XPATH, '//td[contains(text(), "Registro de participantes")]/parent::tr'))
                 )
                 
-                celdas_cronograma = primera_fila_cronograma.find_elements(By.TAG_NAME, "td")
+                celdas_registro = fila_registro.find_elements(By.TAG_NAME, "td")
                 
-                if len(celdas_cronograma) >= 3:
-                    datos['Fecha de Inicio'] = celdas_cronograma[1].text.strip()
-                    datos['Fecha de Fin'] = celdas_cronograma[2].text.strip()
-                    logger.info(f"            ✓ {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
+                if len(celdas_registro) >= 3:
+                    datos['Fecha de Inicio'] = celdas_registro[1].text.strip()
+                    datos['Fecha de Fin'] = celdas_registro[2].text.strip()
+                    logger.info(f"            ✓ Registro: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
                     
             except (NoSuchElementException, TimeoutException):
-                logger.warning("            ⚠️  Sin cronograma")
+                # Si no hay "Registro de participantes", intentar "Presentación de propuestas"
+                logger.info("            ℹ️  Sin 'Registro de participantes', buscando 'Presentación de propuestas'...")
+                try:
+                    fila_presentacion = self.driver.find_element(
+                        By.XPATH,
+                        '//td[contains(text(), "Presentación de propuestas")]/parent::tr'
+                    )
+                    
+                    celdas_presentacion = fila_presentacion.find_elements(By.TAG_NAME, "td")
+                    
+                    if len(celdas_presentacion) >= 3:
+                        datos['Fecha de Inicio'] = celdas_presentacion[1].text.strip()
+                        datos['Fecha de Fin'] = celdas_presentacion[2].text.strip()
+                        logger.info(f"            ✓ Presentación: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
+                        
+                except (NoSuchElementException, TimeoutException):
+                    logger.warning("            ⚠️  Sin fechas de cronograma")
             
             # 2. Extraer Región de la Dirección Legal
             logger.info("         🗺️  Extrayendo región...")
