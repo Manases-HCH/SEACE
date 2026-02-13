@@ -88,16 +88,16 @@ class SeaceScraperCompleto:
         sleep(0.2)  # Reducido de 0.3
     
     def buscar_y_extraer(self, fecha_inicio: datetime, fecha_fin: datetime):
-        """Ejecuta la búsqueda y extrae los datos"""
-        
+       """Ejecuta la búsqueda y extrae los datos"""
+    
         logger.info(f"📅 Rango: {fecha_inicio.strftime('%d/%m/%Y')} → {fecha_fin.strftime('%d/%m/%Y')}")
         
         # Cargar página
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
         
-        # Configurar wait
-        wait = WebDriverWait(self.driver, 25)
+        # Configurar wait más largo para headless
+        wait = WebDriverWait(self.driver, 30)
         
         # Esperar a que desaparezca el loader si existe
         logger.info("⏳ Esperando carga inicial...")
@@ -107,58 +107,104 @@ class SeaceScraperCompleto:
         except:
             logger.info("   ℹ️  No hay loader visible")
         
-        sleep(4)
+        # Espera más larga en headless
+        sleep(6)
         logger.info("   ✓ Espera adicional completada")
         
-        # Pestaña correcta con múltiples estrategias
+        # Verificar que la página cargó correctamente
+        try:
+            body = self.driver.find_element(By.TAG_NAME, "body")
+            logger.info(f"   ✓ Body cargado, texto preview: {body.text[:100]}")
+        except:
+            logger.warning("   ⚠️ No se pudo verificar el body")
+        
+        # Pestaña correcta con múltiples estrategias y logging detallado
         logger.info("🔖 Seleccionando pestaña...")
         tab_clicked = False
         
-        # Estrategia 1: XPath original
+        # Estrategia 1: XPath original con espera explícita
         try:
+            logger.info("   🔍 Intentando Estrategia 1 (XPath)...")
             tab_button = wait.until(
                 EC.presence_of_element_located((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
             )
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab_button)  # ← CORREGIDO
-            sleep(0.5)
+            logger.info(f"      ✓ Elemento encontrado - Visible: {tab_button.is_displayed()}")
+            
+            # Esperar a que sea clickeable
+            tab_button = wait.until(
+                EC.element_to_be_clickable((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
+            )
+            logger.info("      ✓ Elemento clickeable")
+            
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab_button)
+            sleep(1)
             self.driver.execute_script("arguments[0].click();", tab_button)
-            logger.info("   ✓ Click exitoso (Estrategia 1)")
+            logger.info("   ✅ Click exitoso (Estrategia 1)")
             tab_clicked = True
-        except TimeoutException:
-            logger.warning("   ⚠️ Estrategia 1 falló, intentando alternativa...")
+            
+        except Exception as e:
+            logger.warning(f"   ⚠️ Estrategia 1 falló: {str(e)[:100]}")
             
             # Estrategia 2: Por texto
             try:
+                logger.info("   🔍 Intentando Estrategia 2 (Por texto)...")
                 tab_button = wait.until(
                     EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Buscador de Procedimientos'))
                 )
+                logger.info("      ✓ Elemento encontrado por texto")
                 self.driver.execute_script("arguments[0].click();", tab_button)
-                logger.info("   ✓ Click exitoso (Estrategia 2)")
+                logger.info("   ✅ Click exitoso (Estrategia 2)")
                 tab_clicked = True
-            except TimeoutException:
-                logger.warning("   ⚠️ Estrategia 2 falló, intentando estrategia 3...")
+                
+            except Exception as e:
+                logger.warning(f"   ⚠️ Estrategia 2 falló: {str(e)[:100]}")
                 
                 # Estrategia 3: Buscar entre todos los tabs
                 try:
+                    logger.info("   🔍 Intentando Estrategia 3 (Buscar todos)...")
                     tabs = self.driver.find_elements(By.XPATH, '//li[@role="tab"]//a')
-                    for tab in tabs:
+                    logger.info(f"      ℹ️ Encontrados {len(tabs)} tabs")
+                    
+                    for i, tab in enumerate(tabs):
                         try:
                             href = tab.get_attribute('href') or ''
                             texto = tab.text or ''
+                            logger.info(f"         Tab {i+1}: href='{href[:50]}', texto='{texto[:50]}'")
+                            
                             if 'tab1' in href or 'Buscador de Procedimientos' in texto:
+                                logger.info(f"      🎯 Tab correcto encontrado en posición {i+1}")
                                 self.driver.execute_script("arguments[0].scrollIntoView(true);", tab)
-                                sleep(0.5)
+                                sleep(1)
                                 self.driver.execute_script("arguments[0].click();", tab)
-                                logger.info("   ✓ Click exitoso (Estrategia 3)")
+                                logger.info("   ✅ Click exitoso (Estrategia 3)")
                                 tab_clicked = True
                                 break
-                        except:
+                        except Exception as tab_error:
+                            logger.warning(f"         ⚠️ Error en tab {i+1}: {str(tab_error)[:50]}")
                             continue
+                            
                 except Exception as e:
-                    logger.error(f"   ❌ Estrategia 3 falló: {e}")
-        
+                    logger.error(f"   ❌ Estrategia 3 falló: {str(e)[:100]}")
+                    
+                    # Estrategia 4: Click directo sin espera
+                    try:
+                        logger.info("   🔍 Intentando Estrategia 4 (Click directo)...")
+                        self.click('//a[@href="#tbBuscador:tab1"]', wait_after=2)
+                        logger.info("   ✅ Click exitoso (Estrategia 4)")
+                        tab_clicked = True
+                    except Exception as e:
+                        logger.error(f"   ❌ Estrategia 4 falló: {str(e)[:100]}")
+    
         if not tab_clicked:
-            raise Exception("❌ No se pudo hacer click en el tab después de 3 intentos")
+            # Último intento: tomar screenshot para debugging
+            try:
+                screenshot_path = "/tmp/seace_error.png"
+                self.driver.save_screenshot(screenshot_path)
+                logger.error(f"   📸 Screenshot guardado en {screenshot_path}")
+            except:
+                pass
+            
+            raise Exception("❌ No se pudo hacer click en el tab después de 4 intentos")
         
         sleep(2)
         
