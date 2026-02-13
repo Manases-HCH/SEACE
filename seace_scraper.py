@@ -99,13 +99,8 @@ class SeaceScraperCompleto:
         
         # Pestaña correcta
         logger.info("🔖 Seleccionando pestaña...")
-        # Esperar a que el elemento sea clickeable
-        wait = WebDriverWait(self.driver, 15)
-        tab_button = wait.until(
-            EC.element_to_be_clickable((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
-        )
-        self.driver.execute_script("arguments[0].click();", tab_button)
-        sleep(1)  # Reducido de 2 a 1
+        self.click('//a[@href="#tbBuscador:tab1"]')
+        sleep(2)  # Reducido de 2 a 1
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
