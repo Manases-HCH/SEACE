@@ -151,10 +151,10 @@ if __name__ == '__main__':
     logger.info(f"   POST /scrape  - Ejecutar scraping")
     logger.info("=" * 70)
     
-    # CRITICAL: debug=False y threaded=True
+    # Solo para desarrollo local
     app.run(
         host='0.0.0.0',
         port=port,
-        debug=False,      # ← IMPORTANTE
-        threaded=True     # ← IMPORTANTE
+        debug=False,
+        threaded=True
     )
