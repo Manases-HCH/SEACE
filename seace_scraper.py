@@ -114,29 +114,36 @@ class SeaceScraperCompleto:
         # ... (dentro de buscar_y_extraer después de cargar la página)
         wait = WebDriverWait(self.driver, 25)
         
-        logger.info("🔖 Seleccionando pestaña de procedimientos...")
+        logger.info("⏳ Esperando que el menú de pestañas cargue...")
         try:
-            # 1. Esperar a que el enlace con el texto exacto aparezca
-            xpath_tab = "//a[contains(text(), 'Buscador de Procedimientos')]"
-            tab_link = wait.until(EC.presence_of_element_located((By.XPATH, xpath_tab)))
+            # En lugar de buscar el link directamente, esperamos al contenedor principal
+            wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav")))
+            sleep(2) # Respiro para que carguen los scripts internos
             
-            # 2. Asegurar que el elemento esté en el centro de la "pantalla virtual"
-            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", tab_link)
-            sleep(1)
+            # Estrategia INFALIBLE: Buscar todos los links de la lista y hacer clic en el segundo (índice 1)
+            # 0: Anuncio de Contratación Futura | 1: Buscador de Procedimientos
+            tabs = self.driver.find_elements(By.XPATH, '//ul[@role="tablist"]/li/a')
             
-            # 3. Click forzado mediante JavaScript (ignora si hay elementos encima)
-            self.driver.execute_script("arguments[0].click();", tab_link)
-            logger.info("   ✅ Click ejecutado mediante JS")
+            if len(tabs) > 1:
+                target_tab = tabs[1]
+                logger.info(f"🎯 Tab detectado: {target_tab.text}")
+                self.driver.execute_script("arguments[0].click();", target_tab)
+            else:
+                # Fallback por texto si el índice falla
+                logger.info("⚠️ No se encontraron múltiples pestañas, intentando por texto...")
+                self.driver.execute_script(
+                    "document.querySelectorAll('.ui-tabs-nav a').forEach(a => { "
+                    "if(a.innerText.includes('Buscador de Procedimientos')) a.click(); });"
+                )
             
-            # 4. VERIFICACIÓN: Esperar a que el contenedor del tab 1 sea visible
-            wait.until(EC.visibility_of_element_located((By.ID, "tbBuscador:tab1")))
-            logger.info("   ✓ Panel activado y listo")
-        
+            # VERIFICACIÓN: Esperar a que el panel del buscador realmente exista en el DOM
+            wait.until(EC.presence_of_element_located((By.ID, "tbBuscador:tab1")))
+            logger.info("✅ Panel de búsqueda activado")
+            
         except Exception as e:
-            self.driver.save_screenshot("/tmp/error_captura.png")
-            logger.error(f"❌ No se pudo activar el tab: {e}")
-            raise
-        
+            self.driver.save_screenshot("/tmp/debug_fatal.png")
+            raise Exception(f"❌ Fallo al activar el buscador: {str(e)}")
+            
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
         try:
