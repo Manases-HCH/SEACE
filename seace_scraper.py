@@ -88,8 +88,8 @@ class SeaceScraperCompleto:
         sleep(0.2)  # Reducido de 0.3
     
     def buscar_y_extraer(self, fecha_inicio: datetime, fecha_fin: datetime):
-       """Ejecuta la búsqueda y extrae los datos"""
-    
+        """Ejecuta la búsqueda y extrae los datos"""
+        
         logger.info(f"📅 Rango: {fecha_inicio.strftime('%d/%m/%Y')} → {fecha_fin.strftime('%d/%m/%Y')}")
         
         # Cargar página
@@ -194,7 +194,7 @@ class SeaceScraperCompleto:
                         tab_clicked = True
                     except Exception as e:
                         logger.error(f"   ❌ Estrategia 4 falló: {str(e)[:100]}")
-    
+        
         if not tab_clicked:
             # Último intento: tomar screenshot para debugging
             try:
