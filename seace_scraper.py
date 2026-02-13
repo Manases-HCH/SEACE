@@ -25,46 +25,33 @@ class SeaceScraperCompleto:
         self.driver = None
         self.resultados = []
     
-    def iniciar(self):
-        """Inicia el navegador"""
+   def iniciar(self):
+        """Inicia el navegador con configuración optimizada para entornos sin pantalla"""
         logger.info("🚀 Iniciando navegador...")
-        
         options = Options()
         
-        # CRITICAL: Opciones obligatorias para Cloud Run
+        # CRITICAL: Modo headless pero con identidad de navegador real
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-software-rasterizer')
-        options.add_argument('--disable-extensions')
         
-        # Optimizaciones
-        options.add_argument('--disable-blink-features=AutomationControlled')
+        # 1. Simular una pantalla real (Evita que los elementos se oculten)
         options.add_argument('--window-size=1920,1080')
+        
+        # 2. Identidad de navegador real (Evita bloqueos de seguridad)
+        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        
+        options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
-        # Desactivar carga de imágenes
-        prefs = {
-            "profile.managed_default_content_settings.images": 2,
-            "profile.default_content_setting_values.notifications": 2
-        }
-        options.add_experimental_option("prefs", prefs)
-        
-        # IMPORTANT: Usar Chrome del sistema (no ChromeDriverManager)
         try:
-            # Intentar sin service (chromedriver en PATH)
             self.driver = webdriver.Chrome(options=options)
-            logger.info("✅ Chrome iniciado desde PATH")
         except Exception as e:
-            logger.info(f"⚠️ Intentando con ruta explícita: {e}")
-            # Fallback: ruta explícita
             service = Service('/usr/local/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
-            logger.info("✅ Chrome iniciado con ruta explícita")
         
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        logger.info("✅ Navegador iniciado\n")
+        logger.info("✅ Navegador configurado correctamente")
     
     def cerrar(self):
         """Cierra el navegador"""
@@ -118,70 +105,31 @@ class SeaceScraperCompleto:
         except:
             logger.warning("   ⚠️ No se pudo verificar el body")
         
-        # Pestaña correcta - Click directo en tab1
-        logger.info("🔖 Seleccionando pestaña tab1...")
-        tab_clicked = False
+        # ... (dentro de buscar_y_extraer después de cargar la página)
+        wait = WebDriverWait(self.driver, 25)
         
-        # Estrategia simple: Click directo con JavaScript
+        logger.info("🔖 Seleccionando pestaña de procedimientos...")
         try:
-            # Buscar el link del tab1
-            tab_link = self.driver.find_element(By.XPATH, '//a[@href="#tbBuscador:tab1"]')
+            # 1. Esperar a que el enlace con el texto exacto aparezca
+            xpath_tab = "//a[contains(text(), 'Buscador de Procedimientos')]"
+            tab_link = wait.until(EC.presence_of_element_located((By.XPATH, xpath_tab)))
             
-            # Verificar que existe
-            logger.info(f"   ✓ Tab encontrado: '{tab_link.text}'")
+            # 2. Asegurar que el elemento esté en el centro de la "pantalla virtual"
+            self.driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", tab_link)
+            sleep(1)
             
-            # Click con JavaScript (más confiable que Selenium click)
+            # 3. Click forzado mediante JavaScript (ignora si hay elementos encima)
             self.driver.execute_script("arguments[0].click();", tab_link)
-            logger.info("   ✅ Click ejecutado en tab1")
+            logger.info("   ✅ Click ejecutado mediante JS")
             
-            # Esperar a que cambie el estado del tab
-            sleep(2)
-            
-            # Verificar que se activó
-            try:
-                panel_activo = self.driver.find_element(
-                    By.XPATH,
-                    '//*[@id="tbBuscador:tab1" and contains(@style, "display") and not(contains(@style, "none"))]'
-                )
-                logger.info("   ✅ Panel tab1 activado correctamente")
-                tab_clicked = True
-            except NoSuchElementException:
-                # Verificar de otra forma
-                try:
-                    tab_activo = self.driver.find_element(
-                        By.XPATH,
-                        '//li[contains(@class, "ui-tabs-selected")]//a[@href="#tbBuscador:tab1"]'
-                    )
-                    logger.info("   ✅ Tab1 está seleccionado")
-                    tab_clicked = True
-                except:
-                    logger.warning("   ⚠️ No se pudo verificar activación del tab")
-                    tab_clicked = True  # Asumir éxito y continuar
-            
+            # 4. VERIFICACIÓN: Esperar a que el contenedor del tab 1 sea visible
+            wait.until(EC.visibility_of_element_located((By.ID, "tbBuscador:tab1")))
+            logger.info("   ✓ Panel activado y listo")
+        
         except Exception as e:
-            logger.error(f"   ❌ Error haciendo click en tab: {str(e)[:200]}")
-            
-            # Screenshot para debugging
-            try:
-                screenshot_path = "/tmp/seace_tab_error.png"
-                self.driver.save_screenshot(screenshot_path)
-                logger.error(f"   📸 Screenshot guardado en {screenshot_path}")
-                
-                # Guardar HTML para debugging
-                html_path = "/tmp/seace_page.html"
-                with open(html_path, 'w', encoding='utf-8') as f:
-                    f.write(self.driver.page_source)
-                logger.error(f"   📄 HTML guardado en {html_path}")
-            except:
-                pass
-            
-            raise Exception(f"❌ No se pudo activar el tab1: {str(e)}")
-        
-        if not tab_clicked:
-            raise Exception("❌ Tab1 no se activó correctamente")
-        
-        sleep(2)
-        logger.info("   ✓ Tab1 confirmado, continuando...")
+            self.driver.save_screenshot("/tmp/error_captura.png")
+            logger.error(f"❌ No se pudo activar el tab: {e}")
+            raise
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
