@@ -26,37 +26,26 @@ class SeaceScraperCompleto:
         self.resultados = []
     
     def iniciar(self):
-        """Inicia el navegador con configuración para entornos sin pantalla"""
-        logger.info("🚀 Iniciando navegador...")
+        logger.info("🚀 Iniciando navegador en modo ultra-compatible...")
         options = Options()
-        
-        # Modo invisible de nueva generación
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-dev-shm-usage') # Vital para n8n/Docker
         options.add_argument('--disable-gpu')
-        
-        # Simular pantalla real (Evita que elementos se oculten)
         options.add_argument('--window-size=1920,1080')
         
-        # User-agent real para evitar ser detectado como bot
-        options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
+        # User agent real de Windows para evitar detección de bot
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36')
         
-        # Ocultar rastro de automatización
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
         try:
-            # Intento de inicio estándar
             self.driver = webdriver.Chrome(options=options)
-            logger.info("✅ Chrome iniciado")
         except Exception:
-            # Fallback para rutas específicas en servidores Linux
             service = Service('/usr/local/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
-            logger.info("✅ Chrome iniciado con ruta de servicio")
         
-        # Script adicional para bypass de detección
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     def cerrar(self):
@@ -90,42 +79,40 @@ class SeaceScraperCompleto:
         logger.info("📄 Página cargada")
         wait = WebDriverWait(self.driver, 40)
         
-        logger.info("⏳ Iniciando secuencia de activación forzada...")
+        logger.info("⏳ Forzando activación de pestaña vía JS...")
         try:
-            # 1. Esperar a que el contenedor de pestañas exista en el DOM
+            # Esperar a que la estructura base cargue
             wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav")))
-            sleep(3) # Tiempo vital para que el JS del SEACE se estabilice
+            sleep(3) # Pausa necesaria para estabilidad de PrimeFaces
             
-            # 2. INYECCIÓN JS: Buscamos el link que contiene el texto y disparamos el click nativo del navegador
-            # Esto evita el error de "Stacktrace/Element not found" de Selenium
-            script_activacion = """
-            var tabs = document.querySelectorAll('.ui-tabs-nav a');
-            var encontrado = false;
-            tabs.forEach(a => {
-                if(a.innerText.includes('Buscador de Procedimientos')) {
+            # Script que busca el tab y simula el evento de click físico
+            script_fuerza_bruta = """
+            var tabLinks = document.querySelectorAll('.ui-tabs-nav a');
+            var exito = false;
+            for (var a of tabLinks) {
+                if (a.innerText.includes('Buscador de Procedimientos')) {
                     a.click();
-                    encontrado = true;
+                    exito = true;
+                    break;
                 }
-            });
-            return encontrado;
+            }
+            return exito;
             """
-            exito_js = self.driver.execute_script(script_activacion)
             
-            if exito_js:
-                logger.info("   ✅ Señal de click enviada vía JS")
-            else:
-                logger.warning("   ⚠️ No se encontró el texto vía JS, intentando click por índice...")
+            resultado = self.driver.execute_script(script_fuerza_bruta)
+            
+            if not resultado:
+                logger.warning("⚠️ Texto no encontrado, intentando por índice directo...")
                 self.driver.execute_script("document.querySelectorAll('.ui-tabs-nav a')[1].click();")
 
-            # 3. VERIFICACIÓN: Esperar a que el panel del buscador aparezca
-            # No buscamos el botón, buscamos el contenedor que debe hacerse visible
+            # Esperar a que el ID del tab aparezca como visible
             wait.until(EC.visibility_of_element_located((By.ID, "tbBuscador:tab1")))
-            logger.info("   ✅ Panel activado y visible")
+            logger.info("   ✅ Buscador activado con éxito")
             
         except Exception as e:
-            # Captura de emergencia para ver qué recibió el servidor
-            self.driver.save_screenshot("/tmp/debug_error_n8n.png")
-            with open("/tmp/debug_page.html", "w", encoding="utf-8") as f:
+            # Si vuelve a fallar, esto nos dirá qué está viendo el bot realmente
+            self.driver.save_screenshot("/tmp/captura_error.png")
+            with open("/tmp/codigo_fuente.html", "w", encoding="utf-8") as f:
                 f.write(self.driver.page_source)
             raise Exception(f"❌ Fallo al activar el buscador: {str(e)}")
             
