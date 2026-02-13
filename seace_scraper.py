@@ -125,17 +125,40 @@ class SeaceScraperCompleto:
             logger.error(f"❌ Error seleccionando pestaña: {e}")
             return False
         
-        # Búsqueda avanzada
+        # Búsqueda avanzada - VERIFICAR QUE SE ABRA
         logger.info("🔽 Abriendo búsqueda avanzada...")
         try:
-            # Esperar a que el fieldset esté presente
-            fieldset = WebDriverWait(self.driver, 10).until(
-                EC.presence_of_element_located((By.XPATH, '//fieldset/legend'))
+            # Verificar si ya está abierta
+            fieldset_collapsed = self.driver.find_element(
+                By.XPATH, 
+                '//input[@id="tbBuscador:idFormBuscarProceso:j_idt232_collapsed"]'
             )
-            self.driver.execute_script("arguments[0].click();", fieldset)
-            sleep(1)
+            esta_cerrada = fieldset_collapsed.get_attribute('value') == 'true'
+            
+            if esta_cerrada:
+                logger.info("   Búsqueda avanzada cerrada, abriendo...")
+                # Esperar a que el fieldset esté presente
+                fieldset_legend = WebDriverWait(self.driver, 10).until(
+                    EC.presence_of_element_located((By.XPATH, '//fieldset/legend[contains(., "Búsqueda Avanzada")]'))
+                )
+                self.driver.execute_script("arguments[0].click();", fieldset_legend)
+                sleep(1)
+                
+                # Verificar que se haya abierto
+                fieldset_collapsed_nuevo = self.driver.find_element(
+                    By.XPATH, 
+                    '//input[@id="tbBuscador:idFormBuscarProceso:j_idt232_collapsed"]'
+                )
+                if fieldset_collapsed_nuevo.get_attribute('value') == 'false':
+                    logger.info("   ✅ Búsqueda avanzada abierta correctamente")
+                else:
+                    logger.error("   ❌ No se pudo abrir búsqueda avanzada")
+                    return False
+            else:
+                logger.info("   ✅ Búsqueda avanzada ya estaba abierta")
+                
         except TimeoutException:
-            logger.error("❌ No se pudo abrir búsqueda avanzada")
+            logger.error("❌ No se pudo encontrar búsqueda avanzada")
             return False
         
         # Año
@@ -147,8 +170,24 @@ class SeaceScraperCompleto:
         
         # Fechas
         logger.info("📝 Llenando fechas...")
-        self.escribir('//*[@id="tbBuscador:idFormBuscarProceso:dfechaInicio_input"]', fecha_inicio.strftime('%d/%m/%Y'))
-        self.escribir('//*[@id="tbBuscador:idFormBuscarProceso:dfechaFin_input"]', fecha_fin.strftime('%d/%m/%Y'))
+        try:
+            # Verificar que los campos estén visibles
+            campo_inicio = WebDriverWait(self.driver, 10).until(
+                EC.visibility_of_element_located((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:dfechaInicio_input"]'))
+            )
+            campo_fin = WebDriverWait(self.driver, 10).until(
+                EC.visibility_of_element_located((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:dfechaFin_input"]'))
+            )
+            
+            self.escribir('//*[@id="tbBuscador:idFormBuscarProceso:dfechaInicio_input"]', fecha_inicio.strftime('%d/%m/%Y'))
+            logger.info(f"   ✓ Fecha inicio: {fecha_inicio.strftime('%d/%m/%Y')}")
+            
+            self.escribir('//*[@id="tbBuscador:idFormBuscarProceso:dfechaFin_input"]', fecha_fin.strftime('%d/%m/%Y'))
+            logger.info(f"   ✓ Fecha fin: {fecha_fin.strftime('%d/%m/%Y')}")
+            
+        except TimeoutException:
+            logger.error("❌ No se pudieron encontrar los campos de fecha (¿Búsqueda avanzada cerrada?)")
+            return False
         
         # Buscar
         logger.info("🔎 Buscando...")
@@ -171,8 +210,8 @@ class SeaceScraperCompleto:
         try:
             msg = self.driver.find_element(By.XPATH, '//td[contains(text(), "No se encontraron")]')
             if msg.is_displayed():
-                logger.info("ℹ️  No hay datos para estas fechas")
-                return False
+                logger.info("ℹ️  No hay datos para estas fechas - creando archivo vacío")
+                # No retornar False, continuar para crear archivo vacío
         except NoSuchElementException:
             pass
         
@@ -567,10 +606,7 @@ class SeaceScraperCompleto:
             return 0
     
     def guardar_excel(self, fecha_inicio: datetime, nombre_archivo: str = None):
-        """Guarda los resultados en Excel"""
-        if not self.resultados:
-            logger.warning("⚠️  No hay datos para guardar")
-            return False
+        """Guarda los resultados en Excel - crea archivo vacío si no hay datos"""
         
         try:
             # Generar nombre con formato LICIT_PROD2_(AAMMDD).xlsx
@@ -578,30 +614,48 @@ class SeaceScraperCompleto:
                 fecha_formato = fecha_inicio.strftime('%y%m%d')  # AAMMDD
                 nombre_archivo = f"LICIT_PROD2_{fecha_formato}.xlsx"
             
-            df = pd.DataFrame(self.resultados)
-            
-            # Ordenar columnas
-            columnas_orden = [
-                'N°',
-                'Fecha',
-                'Entidad Solicitante',
-                'Descripción del Requerimiento',
-                'Nomenclatura',
-                'Objeto',
-                'Region',
-                'Valor Referencial',
-                'Moneda',
-                'CUBSO',
-                'Fecha de Inicio',
-                'Fecha de Fin'
-            ]
-            
-            # Reordenar si existen todas las columnas
-            columnas_existentes = [col for col in columnas_orden if col in df.columns]
-            df = df[columnas_existentes]
+            if not self.resultados:
+                logger.warning("⚠️  No hay datos - creando archivo vacío")
+                # Crear DataFrame vacío con las columnas esperadas
+                df = pd.DataFrame(columns=[
+                    'N°',
+                    'Fecha',
+                    'Entidad Solicitante',
+                    'Descripción del Requerimiento',
+                    'Nomenclatura',
+                    'Objeto',
+                    'Region',
+                    'Valor Referencial',
+                    'Moneda',
+                    'CUBSO',
+                    'Fecha de Inicio',
+                    'Fecha de Fin'
+                ])
+            else:
+                df = pd.DataFrame(self.resultados)
+                
+                # Ordenar columnas
+                columnas_orden = [
+                    'N°',
+                    'Fecha',
+                    'Entidad Solicitante',
+                    'Descripción del Requerimiento',
+                    'Nomenclatura',
+                    'Objeto',
+                    'Region',
+                    'Valor Referencial',
+                    'Moneda',
+                    'CUBSO',
+                    'Fecha de Inicio',
+                    'Fecha de Fin'
+                ]
+                
+                # Reordenar si existen todas las columnas
+                columnas_existentes = [col for col in columnas_orden if col in df.columns]
+                df = df[columnas_existentes]
             
             df.to_excel(nombre_archivo, index=False, engine='openpyxl')
-            logger.info(f"💾 Archivo guardado: {nombre_archivo}")
+            logger.info(f"💾 Archivo guardado: {nombre_archivo} ({len(self.resultados)} registros)")
             return nombre_archivo
         except Exception as e:
             logger.error(f"❌ Error guardando archivo: {e}")
@@ -685,21 +739,23 @@ def main():
         scraper.iniciar()
         exito = scraper.buscar_y_extraer(fecha_inicio, fecha_fin)
         
-        if exito:
-            scraper.guardar_excel(fecha_inicio)
+        # SIEMPRE guardar archivo, incluso si está vacío
+        archivo_guardado = scraper.guardar_excel(fecha_inicio)
         
         logger.info("⏳ Esperando antes de cerrar...")
         sleep(5)
         
         print("\n" + "=" * 70)
-        if exito and scraper.resultados:
+        if scraper.resultados:
             print("✅ ¡EXTRACCIÓN COMPLETADA!")
             print("=" * 70)
             print(f"\n📊 Total de registros: {len(scraper.resultados)}")
             print(f"💾 Archivo: {nombre_archivo}")
         else:
-            print("⚠️  SIN RESULTADOS")
+            print("⚠️  SIN RESULTADOS - Archivo vacío creado")
             print("=" * 70)
+            print(f"\n📊 Total de registros: 0")
+            print(f"💾 Archivo vacío: {nombre_archivo}")
         print("\n")
             
     except Exception as e:
