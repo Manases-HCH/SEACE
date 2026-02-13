@@ -44,22 +44,23 @@ class SeaceScraperCompleto:
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
         try:
-           # Anti-detección SEACE (MUY IMPORTANTE en n8n cloud)
-            self.driver.execute_cdp_cmd(
-                "Page.addScriptToEvaluateOnNewDocument",
-                {
-                    "source": """
-                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                    window.chrome = { runtime: {} };
-                    Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
-                    Object.defineProperty(navigator, 'languages', {get: () => ['es-PE','es']});
-                    """
-                },
-            )
+            self.driver = webdriver.Chrome(options=options)
         except Exception:
             service = Service('/usr/local/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
         
+        # 2️⃣ ANTI-DETECCIÓN (después de crear el driver)
+        self.driver.execute_cdp_cmd(
+            "Page.addScriptToEvaluateOnNewDocument",
+            {
+                "source": """
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                window.chrome = { runtime: {} };
+                Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+                Object.defineProperty(navigator, 'languages', {get: () => ['es-PE','es']});
+                """
+            },
+        )
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
     
     def cerrar(self):
