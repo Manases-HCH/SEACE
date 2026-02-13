@@ -26,42 +26,45 @@ class SeaceScraperCompleto:
         self.resultados = []
     
     def iniciar(self):
-        logger.info("🚀 Iniciando navegador en modo ultra-compatible...")
+        """Inicia el navegador"""
+        logger.info("🚀 Iniciando navegador...")
+        
         options = Options()
+        
+        # CRITICAL: Opciones obligatorias para Cloud Run
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
-        options.add_argument('--disable-dev-shm-usage') # Vital para n8n/Docker
-        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
         options.add_argument('--disable-software-rasterizer')
         options.add_argument('--disable-extensions')
-        options.add_argument('--disable-gpu')
-        options.add_argument('--window-size=1920,1080')
         
-        # User agent real de Windows para evitar detección de bot
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
-        
+        # Optimizaciones
         options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--window-size=1920,1080')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
+        # Desactivar carga de imágenes
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.notifications": 2
+        }
+        options.add_experimental_option("prefs", prefs)
+        
+        # IMPORTANT: Usar Chrome del sistema (no ChromeDriverManager)
         try:
+            # Intentar sin service (chromedriver en PATH)
             self.driver = webdriver.Chrome(options=options)
-        except Exception:
+            logger.info("✅ Chrome iniciado desde PATH")
+        except Exception as e:
+            logger.info(f"⚠️ Intentando con ruta explícita: {e}")
+            # Fallback: ruta explícita
             service = Service('/usr/local/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
+            logger.info("✅ Chrome iniciado con ruta explícita")
         
-        # 2️⃣ ANTI-DETECCIÓN (después de crear el driver)
-        self.driver.execute_cdp_cmd(
-            "Page.addScriptToEvaluateOnNewDocument",
-            {
-                "source": """
-                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
-                window.chrome = { runtime: {} };
-                Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
-                Object.defineProperty(navigator, 'languages', {get: () => ['es-PE','es']});
-                """
-            },
-        )
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
+        logger.info("✅ Navegador iniciado\n")
     
     def cerrar(self):
         """Cierra el navegador"""
@@ -92,53 +95,24 @@ class SeaceScraperCompleto:
         # Cargar página
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
-        wait = WebDriverWait(self.driver, 40)
+        sleep(2)  # Reducido de 3 a 2
         
-        logger.info("⏳ Activando pestaña correctamente (JSF AJAX)...")
-
-        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav")))
-        sleep(2)
+        # Pestaña correcta
+        logger.info("🔖 Seleccionando pestaña...")
+        self.click('//a[@href="#tbBuscador:tab1"]')
+        sleep(1)  # Reducido de 2 a 1
         
-        # ⚠️ Activar el tab usando PrimeFaces (NO CLICK)
-        self.driver.execute_script("""
-        PrimeFaces.ab({
-            s:'tbBuscador:j_idt28:1:j_idt30',
-            f:'tbBuscador',
-            u:'tbBuscador'
-        });
-        """)
-        # ⚠️ Esperar a que el formulario realmente exista
-        wait.until(EC.presence_of_element_located((
-            By.ID,
-            "tbBuscador:idFormBuscarProceso:anioConvocatoria_label"
-        )))
-        logger.info("   ✅ Buscador activado correctamente")
-
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
-        try:
-            legend = wait.until(
-                EC.element_to_be_clickable((By.XPATH, '//fieldset/legend'))
-            )
-            self.driver.execute_script("arguments[0].click();", legend)
-        except TimeoutException:
-            # Fallback: intentar con click normal
-            self.click('//fieldset/legend')
-        sleep(1)
+        self.click('//fieldset/legend')
+        sleep(1)  # Reducido de 2 a 1
         
         # Año
         logger.info(f"📅 Seleccionando año: {fecha_inicio.year}")
-        try:
-            year_dropdown = wait.until(
-                EC.element_to_be_clickable((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]'))
-            )
-            self.driver.execute_script("arguments[0].click();", year_dropdown)
-        except TimeoutException:
-            self.click('//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]')
-        sleep(0.5)
-        
+        self.click('//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]')
+        sleep(0.5)  # Reducido de 1 a 0.5
         self.click(f'//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_panel"]/div/ul/li[@data-label="{fecha_inicio.year}"]')
-        sleep(0.5)
+        sleep(0.5)  # Reducido de 1 a 0.5
         
         # Fechas
         logger.info("📝 Llenando fechas...")
@@ -148,7 +122,7 @@ class SeaceScraperCompleto:
         # Buscar
         logger.info("🔎 Buscando...")
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        sleep(0.5)
+        sleep(0.5)  # Reducido de 1 a 0.5
         self.click('//*[@id="tbBuscador:idFormBuscarProceso:btnBuscarSelToken"]')
         logger.info("⏳ Esperando resultados...")
         
@@ -157,9 +131,9 @@ class SeaceScraperCompleto:
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:dtProcesos_data"]'))
             )
-            sleep(2)
+            sleep(2)  # Pequeña espera adicional para estabilidad
         except TimeoutException:
-            sleep(5)
+            sleep(5)  # Si falla, esperar un poco más
         
         # Verificar si hay mensaje de "no hay datos"
         try:
@@ -378,6 +352,7 @@ class SeaceScraperCompleto:
             # 1. Extraer Fecha Inicio y Fecha Fin del cronograma
             logger.info("         📅 Extrayendo fechas...")
             # Intentar primero "Registro de participantes"
+            # Intentar primero "Registro de participantes"
             try:
                 fila_registro = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.XPATH, '//td[contains(text(), "Registro de participantes")]/parent::tr'))
@@ -404,10 +379,26 @@ class SeaceScraperCompleto:
                     if len(celdas_presentacion) >= 3:
                         datos['Fecha de Inicio'] = celdas_presentacion[1].text.strip()
                         datos['Fecha de Fin'] = celdas_presentacion[2].text.strip()
-                        logger.info(f"            ✓ Presentación: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
+                        logger.info(f"            ✓ Presentación propuestas: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
                         
                 except (NoSuchElementException, TimeoutException):
-                    logger.warning("            ⚠️  Sin fechas de cronograma")
+                    # Si no hay "Presentación de propuestas", intentar "Presentación de ofertas"
+                    logger.info("            ℹ️  Sin 'Presentación de propuestas', buscando 'Presentación de ofertas'...")
+                    try:
+                        fila_ofertas = self.driver.find_element(
+                            By.XPATH,
+                            '//td[contains(text(), "Presentación de ofertas")]/parent::tr'
+                        )
+                        
+                        celdas_ofertas = fila_ofertas.find_elements(By.TAG_NAME, "td")
+                        
+                        if len(celdas_ofertas) >= 3:
+                            datos['Fecha de Inicio'] = celdas_ofertas[1].text.strip()
+                            datos['Fecha de Fin'] = celdas_ofertas[2].text.strip()
+                            logger.info(f"            ✓ Presentación ofertas: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
+                            
+                    except (NoSuchElementException, TimeoutException):
+                        logger.warning("            ⚠️  Sin fechas de cronograma")
             
             # 2. Extraer Región de la Dirección Legal
             logger.info("         🗺️  Extrayendo región...")
