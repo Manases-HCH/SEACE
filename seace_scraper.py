@@ -31,17 +31,31 @@ class SeaceScraperCompleto:
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage') # Vital para n8n/Docker
+        options.add_argument('--remote-debugging-port=9222')
+        options.add_argument('--disable-software-rasterizer')
+        options.add_argument('--disable-extensions')
         options.add_argument('--disable-gpu')
         options.add_argument('--window-size=1920,1080')
         
         # User agent real de Windows para evitar detección de bot
-        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36')
+        options.add_argument('user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36')
         
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
         try:
-            self.driver = webdriver.Chrome(options=options)
+           # Anti-detección SEACE (MUY IMPORTANTE en n8n cloud)
+            self.driver.execute_cdp_cmd(
+                "Page.addScriptToEvaluateOnNewDocument",
+                {
+                    "source": """
+                    Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                    window.chrome = { runtime: {} };
+                    Object.defineProperty(navigator, 'plugins', {get: () => [1,2,3,4,5]});
+                    Object.defineProperty(navigator, 'languages', {get: () => ['es-PE','es']});
+                    """
+                },
+            )
         except Exception:
             service = Service('/usr/local/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
@@ -79,43 +93,26 @@ class SeaceScraperCompleto:
         logger.info("📄 Página cargada")
         wait = WebDriverWait(self.driver, 40)
         
-        logger.info("⏳ Forzando activación de pestaña vía JS...")
-        try:
-            # Esperar a que la estructura base cargue
-            wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav")))
-            sleep(3) # Pausa necesaria para estabilidad de PrimeFaces
-            
-            # Script que busca el tab y simula el evento de click físico
-            script_fuerza_bruta = """
-            var tabLinks = document.querySelectorAll('.ui-tabs-nav a');
-            var exito = false;
-            for (var a of tabLinks) {
-                if (a.innerText.includes('Buscador de Procedimientos')) {
-                    a.click();
-                    exito = true;
-                    break;
-                }
-            }
-            return exito;
-            """
-            
-            resultado = self.driver.execute_script(script_fuerza_bruta)
-            
-            if not resultado:
-                logger.warning("⚠️ Texto no encontrado, intentando por índice directo...")
-                self.driver.execute_script("document.querySelectorAll('.ui-tabs-nav a')[1].click();")
+        logger.info("⏳ Activando pestaña correctamente (JSF AJAX)...")
 
-            # Esperar a que el ID del tab aparezca como visible
-            wait.until(EC.visibility_of_element_located((By.ID, "tbBuscador:tab1")))
-            logger.info("   ✅ Buscador activado con éxito")
-            
-        except Exception as e:
-            # Si vuelve a fallar, esto nos dirá qué está viendo el bot realmente
-            self.driver.save_screenshot("/tmp/captura_error.png")
-            with open("/tmp/codigo_fuente.html", "w", encoding="utf-8") as f:
-                f.write(self.driver.page_source)
-            raise Exception(f"❌ Fallo al activar el buscador: {str(e)}")
-            
+        wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav")))
+        sleep(2)
+        
+        # ⚠️ Activar el tab usando PrimeFaces (NO CLICK)
+        self.driver.execute_script("""
+        PrimeFaces.ab({
+            s:'tbBuscador:j_idt28:1:j_idt30',
+            f:'tbBuscador',
+            u:'tbBuscador'
+        });
+        """)
+        # ⚠️ Esperar a que el formulario realmente exista
+        wait.until(EC.presence_of_element_located((
+            By.ID,
+            "tbBuscador:idFormBuscarProceso:anioConvocatoria_label"
+        )))
+        logger.info("   ✅ Buscador activado correctamente")
+
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
         try:
