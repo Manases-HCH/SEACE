@@ -119,7 +119,7 @@ class SeaceScraperCompleto:
             tab_button = wait.until(
                 EC.presence_of_element_located((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
             )
-            driver.execute_script("arguments[0].scrollIntoView(true);", tab_button)
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab_button)  # ← CORREGIDO
             sleep(0.5)
             self.driver.execute_script("arguments[0].click();", tab_button)
             logger.info("   ✓ Click exitoso (Estrategia 1)")
@@ -139,20 +139,23 @@ class SeaceScraperCompleto:
                 logger.warning("   ⚠️ Estrategia 2 falló, intentando estrategia 3...")
                 
                 # Estrategia 3: Buscar entre todos los tabs
-                tabs = self.driver.find_elements(By.XPATH, '//li[@role="tab"]//a')
-                for tab in tabs:
-                    try:
-                        href = tab.get_attribute('href') or ''
-                        texto = tab.text or ''
-                        if 'tab1' in href or 'Buscador de Procedimientos' in texto:
-                            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab)
-                            sleep(0.5)
-                            self.driver.execute_script("arguments[0].click();", tab)
-                            logger.info("   ✓ Click exitoso (Estrategia 3)")
-                            tab_clicked = True
-                            break
-                    except:
-                        continue
+                try:
+                    tabs = self.driver.find_elements(By.XPATH, '//li[@role="tab"]//a')
+                    for tab in tabs:
+                        try:
+                            href = tab.get_attribute('href') or ''
+                            texto = tab.text or ''
+                            if 'tab1' in href or 'Buscador de Procedimientos' in texto:
+                                self.driver.execute_script("arguments[0].scrollIntoView(true);", tab)
+                                sleep(0.5)
+                                self.driver.execute_script("arguments[0].click();", tab)
+                                logger.info("   ✓ Click exitoso (Estrategia 3)")
+                                tab_clicked = True
+                                break
+                        except:
+                            continue
+                except Exception as e:
+                    logger.error(f"   ❌ Estrategia 3 falló: {e}")
         
         if not tab_clicked:
             raise Exception("❌ No se pudo hacer click en el tab después de 3 intentos")
