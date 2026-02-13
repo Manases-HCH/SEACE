@@ -221,10 +221,11 @@ class SeaceScraperCompleto:
         
         if self.resultados:
             logger.info(f"✅ Se extrajeron {len(self.resultados)} registros en total")
-            return True
         else:
-            logger.info("⚠️  No se encontraron datos")
-            return False
+            logger.info("ℹ️  No se encontraron datos - se creará archivo vacío")
+        
+        # SIEMPRE retornar True para que se genere el archivo (vacío o con datos)
+        return True
     
     def extraer_datos_con_paginacion(self):
         """Extrae datos de todas las páginas"""
@@ -237,11 +238,13 @@ class SeaceScraperCompleto:
                 # Obtener total de páginas solo la primera vez
                 if pagina_actual == 1:
                     total_paginas = self.obtener_total_paginas()
+                    logger.info(f"   📊 Total de páginas: {total_paginas}")
                 
                 # Extraer datos de la página actual
                 registros_pagina = self.extraer_datos_pagina_actual(pagina_actual)
                 
                 logger.info(f"   ✓ Extraídos {registros_pagina} registros de página {pagina_actual}")
+                logger.info(f"   📊 Total acumulado hasta ahora: {len(self.resultados)} registros")
                 
                 # Si no hay datos, detener
                 if registros_pagina == 0:
@@ -258,6 +261,7 @@ class SeaceScraperCompleto:
                 
             except Exception as e:
                 logger.error(f"❌ Error en página {pagina_actual}: {e}")
+                logger.exception("Stack trace completo:")
                 break
     
     def extraer_datos_pagina_actual(self, pagina_num: int) -> int:
