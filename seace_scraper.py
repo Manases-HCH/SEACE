@@ -118,95 +118,70 @@ class SeaceScraperCompleto:
         except:
             logger.warning("   ⚠️ No se pudo verificar el body")
         
-        # Pestaña correcta con múltiples estrategias y logging detallado
-        logger.info("🔖 Seleccionando pestaña...")
+        # Pestaña correcta - Click directo en tab1
+        logger.info("🔖 Seleccionando pestaña tab1...")
         tab_clicked = False
         
-        # Estrategia 1: XPath original con espera explícita
+        # Estrategia simple: Click directo con JavaScript
         try:
-            logger.info("   🔍 Intentando Estrategia 1 (XPath)...")
-            tab_button = wait.until(
-                EC.presence_of_element_located((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
-            )
-            logger.info(f"      ✓ Elemento encontrado - Visible: {tab_button.is_displayed()}")
+            # Buscar el link del tab1
+            tab_link = self.driver.find_element(By.XPATH, '//a[@href="#tbBuscador:tab1"]')
             
-            # Esperar a que sea clickeable
-            tab_button = wait.until(
-                EC.element_to_be_clickable((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
-            )
-            logger.info("      ✓ Elemento clickeable")
+            # Verificar que existe
+            logger.info(f"   ✓ Tab encontrado: '{tab_link.text}'")
             
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab_button)
-            sleep(1)
-            self.driver.execute_script("arguments[0].click();", tab_button)
-            logger.info("   ✅ Click exitoso (Estrategia 1)")
-            tab_clicked = True
+            # Click con JavaScript (más confiable que Selenium click)
+            self.driver.execute_script("arguments[0].click();", tab_link)
+            logger.info("   ✅ Click ejecutado en tab1")
+            
+            # Esperar a que cambie el estado del tab
+            sleep(2)
+            
+            # Verificar que se activó
+            try:
+                panel_activo = self.driver.find_element(
+                    By.XPATH,
+                    '//*[@id="tbBuscador:tab1" and contains(@style, "display") and not(contains(@style, "none"))]'
+                )
+                logger.info("   ✅ Panel tab1 activado correctamente")
+                tab_clicked = True
+            except NoSuchElementException:
+                # Verificar de otra forma
+                try:
+                    tab_activo = self.driver.find_element(
+                        By.XPATH,
+                        '//li[contains(@class, "ui-tabs-selected")]//a[@href="#tbBuscador:tab1"]'
+                    )
+                    logger.info("   ✅ Tab1 está seleccionado")
+                    tab_clicked = True
+                except:
+                    logger.warning("   ⚠️ No se pudo verificar activación del tab")
+                    tab_clicked = True  # Asumir éxito y continuar
             
         except Exception as e:
-            logger.warning(f"   ⚠️ Estrategia 1 falló: {str(e)[:100]}")
+            logger.error(f"   ❌ Error haciendo click en tab: {str(e)[:200]}")
             
-            # Estrategia 2: Por texto
+            # Screenshot para debugging
             try:
-                logger.info("   🔍 Intentando Estrategia 2 (Por texto)...")
-                tab_button = wait.until(
-                    EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Buscador de Procedimientos'))
-                )
-                logger.info("      ✓ Elemento encontrado por texto")
-                self.driver.execute_script("arguments[0].click();", tab_button)
-                logger.info("   ✅ Click exitoso (Estrategia 2)")
-                tab_clicked = True
-                
-            except Exception as e:
-                logger.warning(f"   ⚠️ Estrategia 2 falló: {str(e)[:100]}")
-                
-                # Estrategia 3: Buscar entre todos los tabs
-                try:
-                    logger.info("   🔍 Intentando Estrategia 3 (Buscar todos)...")
-                    tabs = self.driver.find_elements(By.XPATH, '//li[@role="tab"]//a')
-                    logger.info(f"      ℹ️ Encontrados {len(tabs)} tabs")
-                    
-                    for i, tab in enumerate(tabs):
-                        try:
-                            href = tab.get_attribute('href') or ''
-                            texto = tab.text or ''
-                            logger.info(f"         Tab {i+1}: href='{href[:50]}', texto='{texto[:50]}'")
-                            
-                            if 'tab1' in href or 'Buscador de Procedimientos' in texto:
-                                logger.info(f"      🎯 Tab correcto encontrado en posición {i+1}")
-                                self.driver.execute_script("arguments[0].scrollIntoView(true);", tab)
-                                sleep(1)
-                                self.driver.execute_script("arguments[0].click();", tab)
-                                logger.info("   ✅ Click exitoso (Estrategia 3)")
-                                tab_clicked = True
-                                break
-                        except Exception as tab_error:
-                            logger.warning(f"         ⚠️ Error en tab {i+1}: {str(tab_error)[:50]}")
-                            continue
-                            
-                except Exception as e:
-                    logger.error(f"   ❌ Estrategia 3 falló: {str(e)[:100]}")
-                    
-                    # Estrategia 4: Click directo sin espera
-                    try:
-                        logger.info("   🔍 Intentando Estrategia 4 (Click directo)...")
-                        self.click('//a[@href="#tbBuscador:tab1"]', wait_after=2)
-                        logger.info("   ✅ Click exitoso (Estrategia 4)")
-                        tab_clicked = True
-                    except Exception as e:
-                        logger.error(f"   ❌ Estrategia 4 falló: {str(e)[:100]}")
-        
-        if not tab_clicked:
-            # Último intento: tomar screenshot para debugging
-            try:
-                screenshot_path = "/tmp/seace_error.png"
+                screenshot_path = "/tmp/seace_tab_error.png"
                 self.driver.save_screenshot(screenshot_path)
                 logger.error(f"   📸 Screenshot guardado en {screenshot_path}")
+                
+                # Guardar HTML para debugging
+                html_path = "/tmp/seace_page.html"
+                with open(html_path, 'w', encoding='utf-8') as f:
+                    f.write(self.driver.page_source)
+                logger.error(f"   📄 HTML guardado en {html_path}")
             except:
                 pass
             
-            raise Exception("❌ No se pudo hacer click en el tab después de 4 intentos")
+            raise Exception(f"❌ No se pudo activar el tab1: {str(e)}")
+        
+        if not tab_clicked:
+            raise Exception("❌ Tab1 no se activó correctamente")
         
         sleep(2)
+        logger.info("   ✓ Tab1 confirmado, continuando...")
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
