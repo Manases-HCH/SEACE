@@ -25,33 +25,39 @@ class SeaceScraperCompleto:
         self.driver = None
         self.resultados = []
     
-   def iniciar(self):
-        """Inicia el navegador con configuración optimizada para entornos sin pantalla"""
+    def iniciar(self):
+        """Inicia el navegador con configuración para entornos sin pantalla"""
         logger.info("🚀 Iniciando navegador...")
         options = Options()
         
-        # CRITICAL: Modo headless pero con identidad de navegador real
+        # Modo invisible de nueva generación
         options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
+        options.add_argument('--disable-gpu')
         
-        # 1. Simular una pantalla real (Evita que los elementos se oculten)
+        # Simular pantalla real (Evita que elementos se oculten)
         options.add_argument('--window-size=1920,1080')
         
-        # 2. Identidad de navegador real (Evita bloqueos de seguridad)
+        # User-agent real para evitar ser detectado como bot
         options.add_argument('--user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36')
         
+        # Ocultar rastro de automatización
         options.add_argument('--disable-blink-features=AutomationControlled')
         options.add_experimental_option("excludeSwitches", ["enable-automation"])
         
         try:
+            # Intento de inicio estándar
             self.driver = webdriver.Chrome(options=options)
-        except Exception as e:
+            logger.info("✅ Chrome iniciado")
+        except Exception:
+            # Fallback para rutas específicas en servidores Linux
             service = Service('/usr/local/bin/chromedriver')
             self.driver = webdriver.Chrome(service=service, options=options)
+            logger.info("✅ Chrome iniciado con ruta de servicio")
         
+        # Script adicional para bypass de detección
         self.driver.execute_script("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})")
-        logger.info("✅ Navegador configurado correctamente")
     
     def cerrar(self):
         """Cierra el navegador"""
