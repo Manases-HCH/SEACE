@@ -1,4 +1,3 @@
-
 import sys
 import logging
 from datetime import datetime
@@ -20,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 class SeaceScraperCompleto:
     
-    def __init__(self, headless: bool = True):  # Cambiado de False a True
+    def __init__(self, headless: bool = True):
         self.headless = headless
         self.driver = None
         self.resultados = []
@@ -75,9 +74,9 @@ class SeaceScraperCompleto:
         """Hace clic usando JavaScript con espera configurable"""
         elem = self.driver.find_element(By.XPATH, xpath)
         self.driver.execute_script("arguments[0].scrollIntoView(true);", elem)
-        sleep(0.2)  # Reducido de 0.5
+        sleep(0.2)
         self.driver.execute_script("arguments[0].click();", elem)
-        sleep(wait_after)  # Configurable
+        sleep(wait_after)
     
     def escribir(self, xpath: str, texto: str):
         """Escribe en un campo"""
@@ -85,7 +84,7 @@ class SeaceScraperCompleto:
         self.driver.execute_script("arguments[0].value = '';", elem)
         self.driver.execute_script("arguments[0].value = arguments[1];", elem, texto)
         self.driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", elem)
-        sleep(0.2)  # Reducido de 0.3
+        sleep(0.2)
     
     def buscar_y_extraer(self, fecha_inicio: datetime, fecha_fin: datetime):
         """Ejecuta la búsqueda y extrae los datos"""
@@ -95,24 +94,56 @@ class SeaceScraperCompleto:
         # Cargar página
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
-        sleep(2)  # Reducido de 3 a 2
         
-        # Pestaña correcta
+        # Esperar a que la página cargue completamente
+        try:
+            WebDriverWait(self.driver, 15).until(
+                EC.presence_of_element_located((By.ID, "tbBuscador"))
+            )
+            sleep(2)
+        except TimeoutException:
+            logger.warning("⚠️ Timeout esperando tbBuscador")
+            sleep(3)
+        
+        # Pestaña correcta - Usar JavaScript para hacer clic ya que el elemento puede estar oculto
         logger.info("🔖 Seleccionando pestaña...")
-        self.click('//a[@href="#tbBuscador:tab1"]')
-        sleep(2)  # Reducido de 2 a 1
+        try:
+            # Esperar a que el enlace esté presente
+            tab_link = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
+            )
+            # Hacer scroll y clic con JavaScript (más confiable para pestañas)
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab_link)
+            sleep(0.5)
+            self.driver.execute_script("arguments[0].click();", tab_link)
+            sleep(2)
+            logger.info("✅ Pestaña seleccionada")
+        except TimeoutException:
+            logger.error("❌ No se pudo encontrar la pestaña tab1")
+            return False
+        except Exception as e:
+            logger.error(f"❌ Error seleccionando pestaña: {e}")
+            return False
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
-        self.click('//fieldset/legend')
-        sleep(1)  # Reducido de 2 a 1
+        try:
+            # Esperar a que el fieldset esté presente
+            fieldset = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//fieldset/legend'))
+            )
+            self.driver.execute_script("arguments[0].click();", fieldset)
+            sleep(1)
+        except TimeoutException:
+            logger.error("❌ No se pudo abrir búsqueda avanzada")
+            return False
         
         # Año
         logger.info(f"📅 Seleccionando año: {fecha_inicio.year}")
         self.click('//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]')
-        sleep(2)  # Reducido de 1 a 0.5
+        sleep(0.5)
         self.click(f'//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_panel"]/div/ul/li[@data-label="{fecha_inicio.year}"]')
-        sleep(2)  # Reducido de 1 a 0.5
+        sleep(0.5)
         
         # Fechas
         logger.info("📝 Llenando fechas...")
@@ -122,18 +153,19 @@ class SeaceScraperCompleto:
         # Buscar
         logger.info("🔎 Buscando...")
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        sleep(2)  # Reducido de 1 a 0.5
+        sleep(0.5)
         self.click('//*[@id="tbBuscador:idFormBuscarProceso:btnBuscarSelToken"]')
         logger.info("⏳ Esperando resultados...")
         
         # Esperar con WebDriverWait en lugar de sleep fijo
         try:
-            WebDriverWait(self.driver, 10).until(
+            WebDriverWait(self.driver, 15).until(
                 EC.presence_of_element_located((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:dtProcesos_data"]'))
             )
-            sleep(2)  # Pequeña espera adicional para estabilidad
+            sleep(2)
         except TimeoutException:
-            sleep(5)  # Si falla, esperar un poco más
+            logger.warning("⚠️ Timeout esperando resultados")
+            sleep(5)
         
         # Verificar si hay mensaje de "no hay datos"
         try:
@@ -183,7 +215,7 @@ class SeaceScraperCompleto:
                     break
                 
                 pagina_actual += 1
-                sleep(2)  # Reducido de 3 a 2
+                sleep(2)
                 
             except Exception as e:
                 logger.error(f"❌ Error en página {pagina_actual}: {e}")
@@ -240,7 +272,6 @@ class SeaceScraperCompleto:
                     celdas = fila.find_elements(By.TAG_NAME, "td")
                     
                     # ⚠️ CRÍTICO: Extraer TODO el texto ANTES de hacer clic
-                    # (para evitar stale elements después de volver)
                     try:
                         texto_celdas = [celda.text.strip() for celda in celdas]
                     except:
@@ -332,12 +363,6 @@ class SeaceScraperCompleto:
         except Exception as e:
             logger.error(f"❌ Error extrayendo datos de página: {e}")
             return registros_extraidos
-            
-            return registros_extraidos
-            
-        except Exception as e:
-            logger.error(f"❌ Error extrayendo datos de página: {e}")
-            return registros_extraidos
     
     def extraer_datos_ficha(self) -> dict:
         """Extrae los datos adicionales de la ficha de selección - OPTIMIZADO"""
@@ -351,8 +376,6 @@ class SeaceScraperCompleto:
         try:
             # 1. Extraer Fecha Inicio y Fecha Fin del cronograma
             logger.info("         📅 Extrayendo fechas...")
-            # Intentar primero "Registro de participantes"
-            # Intentar primero "Registro de participantes"
             try:
                 fila_registro = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.XPATH, '//td[contains(text(), "Registro de participantes")]/parent::tr'))
@@ -366,7 +389,6 @@ class SeaceScraperCompleto:
                     logger.info(f"            ✓ Registro: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
                     
             except (NoSuchElementException, TimeoutException):
-                # Si no hay "Registro de participantes", intentar "Presentación de propuestas"
                 logger.info("            ℹ️  Sin 'Registro de participantes', buscando 'Presentación de propuestas'...")
                 try:
                     fila_presentacion = self.driver.find_element(
@@ -382,7 +404,6 @@ class SeaceScraperCompleto:
                         logger.info(f"            ✓ Presentación propuestas: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
                         
                 except (NoSuchElementException, TimeoutException):
-                    # Si no hay "Presentación de propuestas", intentar "Presentación de ofertas"
                     logger.info("            ℹ️  Sin 'Presentación de propuestas', buscando 'Presentación de ofertas'...")
                     try:
                         fila_ofertas = self.driver.find_element(
@@ -426,9 +447,9 @@ class SeaceScraperCompleto:
                 )
                 
                 self.driver.execute_script("arguments[0].scrollIntoView(true);", legend_items)
-                sleep(0.2)  # Reducido de 0.5
+                sleep(0.2)
                 self.driver.execute_script("arguments[0].click();", legend_items)
-                sleep(1)  # Reducido de 2 a 1
+                sleep(1)
                 
                 # Extraer Código CUBSO
                 try:
@@ -453,7 +474,7 @@ class SeaceScraperCompleto:
     def volver_a_lista(self):
         """Vuelve a la lista de resultados desde la ficha"""
         try:
-            # Buscar el botón de volver (puede variar, intenta varios selectores)
+            # Buscar el botón de volver
             xpaths_volver = [
                 '//button[contains(., "Volver")]',
                 '//button[contains(@id, "btnVolver")]',
@@ -493,12 +514,12 @@ class SeaceScraperCompleto:
                 if boton_siguiente.is_displayed():
                     logger.info(f"   → Yendo a página {siguiente_pagina}...")
                     self.driver.execute_script("arguments[0].scrollIntoView(true);", boton_siguiente)
-                    sleep(0.3)  # Reducido de 0.5
+                    sleep(0.3)
                     self.driver.execute_script("arguments[0].click();", boton_siguiente)
                     return True
             except NoSuchElementException:
                 try:
-                    xpath_siguiente_link = '//a[contains(@class, "ui-paginator-next")]'  # Corregido typo "xpathh"
+                    xpath_siguiente_link = '//a[contains(@class, "ui-paginator-next")]'
                     boton_siguiente_link = self.driver.find_element(By.XPATH, xpath_siguiente_link)
                     class_attr = boton_siguiente_link.get_attribute('class')
                     
@@ -581,7 +602,7 @@ class SeaceScraperCompleto:
             
             df.to_excel(nombre_archivo, index=False, engine='openpyxl')
             logger.info(f"💾 Archivo guardado: {nombre_archivo}")
-            return nombre_archivo  # Retornar el nombre del archivo
+            return nombre_archivo
         except Exception as e:
             logger.error(f"❌ Error guardando archivo: {e}")
             return False
@@ -687,3 +708,7 @@ def main():
         traceback.print_exc()
     finally:
         scraper.cerrar()
+
+
+if __name__ == "__main__":
+    main()
