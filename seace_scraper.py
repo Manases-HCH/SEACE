@@ -378,7 +378,6 @@ class SeaceScraperCompleto:
             # 1. Extraer Fecha Inicio y Fecha Fin del cronograma
             logger.info("         📅 Extrayendo fechas...")
             # Intentar primero "Registro de participantes"
-            # Intentar primero "Registro de participantes"
             try:
                 fila_registro = WebDriverWait(self.driver, 3).until(
                     EC.presence_of_element_located((By.XPATH, '//td[contains(text(), "Registro de participantes")]/parent::tr'))
@@ -405,26 +404,10 @@ class SeaceScraperCompleto:
                     if len(celdas_presentacion) >= 3:
                         datos['Fecha de Inicio'] = celdas_presentacion[1].text.strip()
                         datos['Fecha de Fin'] = celdas_presentacion[2].text.strip()
-                        logger.info(f"            ✓ Presentación propuestas: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
+                        logger.info(f"            ✓ Presentación: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
                         
                 except (NoSuchElementException, TimeoutException):
-                    # Si no hay "Presentación de propuestas", intentar "Presentación de ofertas"
-                    logger.info("            ℹ️  Sin 'Presentación de propuestas', buscando 'Presentación de ofertas'...")
-                    try:
-                        fila_ofertas = self.driver.find_element(
-                            By.XPATH,
-                            '//td[contains(text(), "Presentación de ofertas")]/parent::tr'
-                        )
-                        
-                        celdas_ofertas = fila_ofertas.find_elements(By.TAG_NAME, "td")
-                        
-                        if len(celdas_ofertas) >= 3:
-                            datos['Fecha de Inicio'] = celdas_ofertas[1].text.strip()
-                            datos['Fecha de Fin'] = celdas_ofertas[2].text.strip()
-                            logger.info(f"            ✓ Presentación ofertas: {datos['Fecha de Inicio']} - {datos['Fecha de Fin']}")
-                            
-                    except (NoSuchElementException, TimeoutException):
-                        logger.warning("            ⚠️  Sin fechas de cronograma")
+                    logger.warning("            ⚠️  Sin fechas de cronograma")
             
             # 2. Extraer Región de la Dirección Legal
             logger.info("         🗺️  Extrayendo región...")
