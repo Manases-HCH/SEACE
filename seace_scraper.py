@@ -88,60 +88,45 @@ class SeaceScraperCompleto:
         # Cargar página
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
+        wait = WebDriverWait(self.driver, 40)
         
-        # Configurar wait más largo para headless
-        wait = WebDriverWait(self.driver, 30)
-        
-        # Esperar a que desaparezca el loader si existe
-        logger.info("⏳ Esperando carga inicial...")
+        logger.info("⏳ Iniciando secuencia de activación forzada...")
         try:
-            wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "ui-blockui")))
-            logger.info("   ✓ Loader desaparecido")
-        except:
-            logger.info("   ℹ️  No hay loader visible")
-        
-        # Espera más larga en headless
-        sleep(6)
-        logger.info("   ✓ Espera adicional completada")
-        
-        # Verificar que la página cargó correctamente
-        try:
-            body = self.driver.find_element(By.TAG_NAME, "body")
-            logger.info(f"   ✓ Body cargado, texto preview: {body.text[:100]}")
-        except:
-            logger.warning("   ⚠️ No se pudo verificar el body")
-        
-        # ... (dentro de buscar_y_extraer después de cargar la página)
-        wait = WebDriverWait(self.driver, 25)
-        
-        logger.info("⏳ Esperando que el menú de pestañas cargue...")
-        try:
-            # En lugar de buscar el link directamente, esperamos al contenedor principal
+            # 1. Esperar a que el contenedor de pestañas exista en el DOM
             wait.until(EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav")))
-            sleep(2) # Respiro para que carguen los scripts internos
+            sleep(3) # Tiempo vital para que el JS del SEACE se estabilice
             
-            # Estrategia INFALIBLE: Buscar todos los links de la lista y hacer clic en el segundo (índice 1)
-            # 0: Anuncio de Contratación Futura | 1: Buscador de Procedimientos
-            tabs = self.driver.find_elements(By.XPATH, '//ul[@role="tablist"]/li/a')
+            # 2. INYECCIÓN JS: Buscamos el link que contiene el texto y disparamos el click nativo del navegador
+            # Esto evita el error de "Stacktrace/Element not found" de Selenium
+            script_activacion = """
+            var tabs = document.querySelectorAll('.ui-tabs-nav a');
+            var encontrado = false;
+            tabs.forEach(a => {
+                if(a.innerText.includes('Buscador de Procedimientos')) {
+                    a.click();
+                    encontrado = true;
+                }
+            });
+            return encontrado;
+            """
+            exito_js = self.driver.execute_script(script_activacion)
             
-            if len(tabs) > 1:
-                target_tab = tabs[1]
-                logger.info(f"🎯 Tab detectado: {target_tab.text}")
-                self.driver.execute_script("arguments[0].click();", target_tab)
+            if exito_js:
+                logger.info("   ✅ Señal de click enviada vía JS")
             else:
-                # Fallback por texto si el índice falla
-                logger.info("⚠️ No se encontraron múltiples pestañas, intentando por texto...")
-                self.driver.execute_script(
-                    "document.querySelectorAll('.ui-tabs-nav a').forEach(a => { "
-                    "if(a.innerText.includes('Buscador de Procedimientos')) a.click(); });"
-                )
-            
-            # VERIFICACIÓN: Esperar a que el panel del buscador realmente exista en el DOM
-            wait.until(EC.presence_of_element_located((By.ID, "tbBuscador:tab1")))
-            logger.info("✅ Panel de búsqueda activado")
+                logger.warning("   ⚠️ No se encontró el texto vía JS, intentando click por índice...")
+                self.driver.execute_script("document.querySelectorAll('.ui-tabs-nav a')[1].click();")
+
+            # 3. VERIFICACIÓN: Esperar a que el panel del buscador aparezca
+            # No buscamos el botón, buscamos el contenedor que debe hacerse visible
+            wait.until(EC.visibility_of_element_located((By.ID, "tbBuscador:tab1")))
+            logger.info("   ✅ Panel activado y visible")
             
         except Exception as e:
-            self.driver.save_screenshot("/tmp/debug_fatal.png")
+            # Captura de emergencia para ver qué recibió el servidor
+            self.driver.save_screenshot("/tmp/debug_error_n8n.png")
+            with open("/tmp/debug_page.html", "w", encoding="utf-8") as f:
+                f.write(self.driver.page_source)
             raise Exception(f"❌ Fallo al activar el buscador: {str(e)}")
             
         # Búsqueda avanzada
