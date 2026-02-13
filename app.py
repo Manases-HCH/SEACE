@@ -3,11 +3,11 @@ from datetime import datetime
 import os
 import logging
 import tempfile
-
-# NO importar SeaceScraperCompleto aquí - lazy import
+import pandas as pd
+from seace_scraper import SeaceScraperCompleto
 
 app = Flask(__name__)
-logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @app.route('/')
@@ -15,18 +15,15 @@ def home():
     return jsonify({
         "status": "online",
         "service": "SEACE Scraper API",
-        "version": "1.0",
         "endpoints": {
-            "/": "GET - Service info",
             "/health": "GET - Health check",
             "/scrape": "POST - Ejecutar scraping (params: fecha_inicio, fecha_fin)"
         }
-    }), 200
+    })
 
 @app.route('/health')
 def health():
-    """Health check - responde inmediatamente"""
-    return jsonify({"status": "healthy"}), 200
+    return jsonify({"status": "healthy"})
 
 @app.route('/scrape', methods=['POST'])
 def scrape():
@@ -34,11 +31,6 @@ def scrape():
     archivo_temporal = None
     
     try:
-        # LAZY IMPORT: Solo cuando se necesita
-        logger.info("📦 Importando SeaceScraperCompleto...")
-        from seace_scraper import SeaceScraperCompleto
-        import pandas as pd
-        
         logger.info("📥 Recibida solicitud de scraping")
         data = request.json
         
@@ -58,22 +50,17 @@ def scrape():
         logger.info(f"📅 Fechas: {fecha_inicio.strftime('%Y-%m-%d')} → {fecha_fin.strftime('%Y-%m-%d')}")
         
         # Crear y ejecutar scraper
-        logger.info("🚀 Iniciando scraper...")
         scraper = SeaceScraperCompleto(headless=True)
         scraper.iniciar()
-        
-        logger.info("🔍 Ejecutando búsqueda...")
         exito = scraper.buscar_y_extraer(fecha_inicio, fecha_fin)
         
         if not exito or not scraper.resultados:
             logger.warning("⚠️ No se encontraron resultados")
             return jsonify({
-                "success": False,
-                "message": "No se encontraron resultados",
+                "error": "No se encontraron resultados",
                 "fecha_inicio": data['fecha_inicio'],
-                "fecha_fin": data['fecha_fin'],
-                "total": 0
-            }), 200  # No es error 404, simplemente no hay datos
+                "fecha_fin": data['fecha_fin']
+            }), 404
         
         # Generar nombre de archivo
         fecha_formato = fecha_inicio.strftime('%y%m%d')  # AAMMDD
@@ -124,10 +111,7 @@ def scrape():
         logger.error(f"❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return jsonify({
-            "success": False,
-            "error": str(e)
-        }), 500
+        return jsonify({"error": str(e)}), 500
         
     finally:
         # Cerrar navegador siempre
@@ -135,26 +119,13 @@ def scrape():
             try:
                 scraper.cerrar()
                 logger.info("🔒 Navegador cerrado")
-            except Exception as e:
-                logger.warning(f"⚠️ Error cerrando navegador: {e}")
+            except:
+                pass
+        
+        # Limpiar archivo temporal después de enviarlo
+        # (Flask se encarga de esto automáticamente con send_file)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 8080))
-    logger.info("=" * 70)
-    logger.info(f"🚀 SEACE Scraper API v1.0")
-    logger.info("=" * 70)
-    logger.info(f"📍 Puerto: {port}")
-    logger.info(f"📍 Host: 0.0.0.0")
-    logger.info(f"📍 Endpoints:")
-    logger.info(f"   GET  /        - Service info")
-    logger.info(f"   GET  /health  - Health check")
-    logger.info(f"   POST /scrape  - Ejecutar scraping")
-    logger.info("=" * 70)
-    
-    # Solo para desarrollo local
-    app.run(
-        host='0.0.0.0',
-        port=port,
-        debug=False,
-        threaded=True
-    )
+    logger.info(f"🚀 Iniciando servidor en puerto {port}")
+    app.run(host='0.0.0.0', port=port)
