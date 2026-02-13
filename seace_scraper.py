@@ -95,24 +95,95 @@ class SeaceScraperCompleto:
         # Cargar página
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
-        sleep(2)  # Reducido de 3 a 2
         
-        # Pestaña correcta
+        # Configurar wait
+        wait = WebDriverWait(self.driver, 25)
+        
+        # Esperar a que desaparezca el loader si existe
+        logger.info("⏳ Esperando carga inicial...")
+        try:
+            wait.until(EC.invisibility_of_element_located((By.CLASS_NAME, "ui-blockui")))
+            logger.info("   ✓ Loader desaparecido")
+        except:
+            logger.info("   ℹ️  No hay loader visible")
+        
+        sleep(4)
+        logger.info("   ✓ Espera adicional completada")
+        
+        # Pestaña correcta con múltiples estrategias
         logger.info("🔖 Seleccionando pestaña...")
-        self.click('//a[@href="#tbBuscador:tab1"]')
-        sleep(2)  # Reducido de 2 a 1
+        tab_clicked = False
+        
+        # Estrategia 1: XPath original
+        try:
+            tab_button = wait.until(
+                EC.presence_of_element_located((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
+            )
+            driver.execute_script("arguments[0].scrollIntoView(true);", tab_button)
+            sleep(0.5)
+            self.driver.execute_script("arguments[0].click();", tab_button)
+            logger.info("   ✓ Click exitoso (Estrategia 1)")
+            tab_clicked = True
+        except TimeoutException:
+            logger.warning("   ⚠️ Estrategia 1 falló, intentando alternativa...")
+            
+            # Estrategia 2: Por texto
+            try:
+                tab_button = wait.until(
+                    EC.element_to_be_clickable((By.PARTIAL_LINK_TEXT, 'Buscador de Procedimientos'))
+                )
+                self.driver.execute_script("arguments[0].click();", tab_button)
+                logger.info("   ✓ Click exitoso (Estrategia 2)")
+                tab_clicked = True
+            except TimeoutException:
+                logger.warning("   ⚠️ Estrategia 2 falló, intentando estrategia 3...")
+                
+                # Estrategia 3: Buscar entre todos los tabs
+                tabs = self.driver.find_elements(By.XPATH, '//li[@role="tab"]//a')
+                for tab in tabs:
+                    try:
+                        href = tab.get_attribute('href') or ''
+                        texto = tab.text or ''
+                        if 'tab1' in href or 'Buscador de Procedimientos' in texto:
+                            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab)
+                            sleep(0.5)
+                            self.driver.execute_script("arguments[0].click();", tab)
+                            logger.info("   ✓ Click exitoso (Estrategia 3)")
+                            tab_clicked = True
+                            break
+                    except:
+                        continue
+        
+        if not tab_clicked:
+            raise Exception("❌ No se pudo hacer click en el tab después de 3 intentos")
+        
+        sleep(2)
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
-        self.click('//fieldset/legend')
-        sleep(2)  # Reducido de 2 a 1
+        try:
+            legend = wait.until(
+                EC.element_to_be_clickable((By.XPATH, '//fieldset/legend'))
+            )
+            self.driver.execute_script("arguments[0].click();", legend)
+        except TimeoutException:
+            # Fallback: intentar con click normal
+            self.click('//fieldset/legend')
+        sleep(1)
         
         # Año
         logger.info(f"📅 Seleccionando año: {fecha_inicio.year}")
-        self.click('//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]')
-        sleep(0.5)  # Reducido de 1 a 0.5
+        try:
+            year_dropdown = wait.until(
+                EC.element_to_be_clickable((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]'))
+            )
+            self.driver.execute_script("arguments[0].click();", year_dropdown)
+        except TimeoutException:
+            self.click('//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]')
+        sleep(0.5)
+        
         self.click(f'//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_panel"]/div/ul/li[@data-label="{fecha_inicio.year}"]')
-        sleep(0.5)  # Reducido de 1 a 0.5
+        sleep(0.5)
         
         # Fechas
         logger.info("📝 Llenando fechas...")
@@ -122,7 +193,7 @@ class SeaceScraperCompleto:
         # Buscar
         logger.info("🔎 Buscando...")
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        sleep(0.5)  # Reducido de 1 a 0.5
+        sleep(0.5)
         self.click('//*[@id="tbBuscador:idFormBuscarProceso:btnBuscarSelToken"]')
         logger.info("⏳ Esperando resultados...")
         
@@ -131,9 +202,9 @@ class SeaceScraperCompleto:
             WebDriverWait(self.driver, 10).until(
                 EC.presence_of_element_located((By.XPATH, '//*[@id="tbBuscador:idFormBuscarProceso:dtProcesos_data"]'))
             )
-            sleep(2)  # Pequeña espera adicional para estabilidad
+            sleep(2)
         except TimeoutException:
-            sleep(5)  # Si falla, esperar un poco más
+            sleep(5)
         
         # Verificar si hay mensaje de "no hay datos"
         try:
