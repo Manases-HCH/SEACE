@@ -71,19 +71,13 @@ class SeaceScraperCompleto:
         if self.driver:
             self.driver.quit()
     
-    def click(self, xpath: str, timeout: int = 15):
-        """Espera a que el elemento sea clicable y hace clic usando JS"""
-        try:
-            # Espera explícita hasta que el elemento sea visible y clicable
-            elem = WebDriverWait(self.driver, timeout).until(
-                EC.element_to_be_clickable((By.XPATH, xpath))
-            )
-            self.driver.execute_script("arguments[0].scrollIntoView(true);", elem)
-            sleep(0.5)  # Breve pausa para estabilidad post-scroll
-            self.driver.execute_script("arguments[0].click();", elem)
-        except Exception as e:
-            logger.error(f"❌ Error al hacer clic en {xpath}: {e}")
-            raise
+    def click(self, xpath: str, wait_after: float = 0.3):
+        """Hace clic usando JavaScript con espera configurable"""
+        elem = self.driver.find_element(By.XPATH, xpath)
+        self.driver.execute_script("arguments[0].scrollIntoView(true);", elem)
+        sleep(0.2)  # Reducido de 0.5
+        self.driver.execute_script("arguments[0].click();", elem)
+        sleep(wait_after)  # Configurable
     
     def escribir(self, xpath: str, texto: str):
         """Escribe en un campo"""
@@ -97,28 +91,16 @@ class SeaceScraperCompleto:
         """Ejecuta la búsqueda y extrae los datos"""
         
         logger.info(f"📅 Rango: {fecha_inicio.strftime('%d/%m/%Y')} → {fecha_fin.strftime('%d/%m/%Y')}")
-    
+        
+        # Cargar página
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
-        logger.info("📄 Página cargada, esperando estabilidad...")
+        logger.info("📄 Página cargada")
+        sleep(2)  # Reducido de 3 a 2
         
-        # 1. ESPERA CRÍTICA: Esperar a que el contenedor de pestañas aparezca
-        try:
-            WebDriverWait(self.driver, 20).until(
-                EC.presence_of_element_located((By.CLASS_NAME, "ui-tabs-nav"))
-            )
-        except TimeoutException:
-            logger.error("❌ La página no cargó las pestañas a tiempo")
-            return False
-    
-        # 2. SELECCIONAR PESTAÑA: Usar un selector que busque el texto por si el href falla
-        logger.info("🔖 Seleccionando pestaña 'Buscador de Procedimientos de Selección'...")
-        tab_xpath = '//a[contains(text(), "Buscador de Procedimientos de Selección")]'
-        self.click(tab_xpath)
-        
-        # 3. VERIFICAR CAMBIO: Esperar a que el formulario de la pestaña sea visible
-        WebDriverWait(self.driver, 10).until(
-            EC.visibility_of_element_located((By.ID, "tbBuscador:idFormBuscarProceso"))
-        )
+        # Pestaña correcta
+        logger.info("🔖 Seleccionando pestaña...")
+        self.click('//a[@href="#tbBuscador:tab1"]')
+        sleep(2)  # Reducido de 2 a 1
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
@@ -128,9 +110,9 @@ class SeaceScraperCompleto:
         # Año
         logger.info(f"📅 Seleccionando año: {fecha_inicio.year}")
         self.click('//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_label"]')
-        sleep(0.5)  # Reducido de 1 a 0.5
+        sleep(2)  # Reducido de 1 a 0.5
         self.click(f'//*[@id="tbBuscador:idFormBuscarProceso:anioConvocatoria_panel"]/div/ul/li[@data-label="{fecha_inicio.year}"]')
-        sleep(0.5)  # Reducido de 1 a 0.5
+        sleep(2)  # Reducido de 1 a 0.5
         
         # Fechas
         logger.info("📝 Llenando fechas...")
@@ -140,7 +122,7 @@ class SeaceScraperCompleto:
         # Buscar
         logger.info("🔎 Buscando...")
         self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-        sleep(0.5)  # Reducido de 1 a 0.5
+        sleep(2)  # Reducido de 1 a 0.5
         self.click('//*[@id="tbBuscador:idFormBuscarProceso:btnBuscarSelToken"]')
         logger.info("⏳ Esperando resultados...")
         
