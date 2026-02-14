@@ -84,7 +84,7 @@ class SeaceScraperCompleto:
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
         sleep(2)  # Reducido de 3 a 2
-        
+        wait = WebDriverWait(self.driver, 20)
         logger.info("🔖 Esperando a que el tab1 sea interactuable...")
         try:
             # Esperar a que el elemento no solo esté, sino que sea clickable
