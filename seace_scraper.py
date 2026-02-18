@@ -28,16 +28,28 @@ class SeaceScraperCompleto:
     def iniciar(self):
         """Inicia el navegador"""
         logger.info("🚀 Iniciando navegador...")
-
+        
         options = Options()
-        options.add_argument('--headless=new') # Obligatorio en Cloud Run
+        
+        # CRITICAL: Opciones obligatorias para Cloud Run
+        options.add_argument('--headless=new')
         options.add_argument('--no-sandbox')
         options.add_argument('--disable-dev-shm-usage')
-        options.binary_location = "/usr/bin/chromium" # Ruta definida en Dockerfile
-    
-        # Usar el driver instalado por el sistema
-        service = Service("/usr/bin/chromedriver")
-        self.driver = webdriver.Chrome(service=service, options=options)
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-software-rasterizer')
+        options.add_argument('--disable-extensions')
+        
+        # Optimizaciones
+        options.add_argument('--disable-blink-features=AutomationControlled')
+        options.add_argument('--window-size=1920,1080')
+        options.add_experimental_option("excludeSwitches", ["enable-automation"])
+        
+        # Desactivar carga de imágenes
+        prefs = {
+            "profile.managed_default_content_settings.images": 2,
+            "profile.default_content_setting_values.notifications": 2
+        }
+        options.add_experimental_option("prefs", prefs)
         
         # IMPORTANT: Usar Chrome del sistema (no ChromeDriverManager)
         try:
@@ -84,18 +96,11 @@ class SeaceScraperCompleto:
         self.driver.get("https://prod2.seace.gob.pe/seacebus-uiwd-pub/buscadorPublico/buscadorPublico.xhtml")
         logger.info("📄 Página cargada")
         sleep(2)  # Reducido de 3 a 2
-        wait = WebDriverWait(self.driver, 20)
-        logger.info("🔖 Esperando a que el tab1 sea interactuable...")
-        try:
-            # Esperar a que el elemento no solo esté, sino que sea clickable
-            tab1 = wait.until(EC.element_to_be_clickable((By.XPATH, '//a[@href="#tbBuscador:tab1"]')))
-            self.driver.execute_script("arguments[0].click();", tab1)
-            logger.info("✅ Tab1 clickeado con éxito")
-        except Exception as e:
-            logger.error(f"❌ Error en Tab1: {e}")
-            # Tomar captura de pantalla para debug en Cloud Run (se ve en Logs)
-            self.driver.save_screenshot("error_tab1.png")
-            return False
+        
+        # Pestaña correcta
+        logger.info("🔖 Seleccionando pestaña...")
+        self.click('//a[@href="#tbBuscador:tab1"]')
+        sleep(1)  # Reducido de 2 a 1
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
