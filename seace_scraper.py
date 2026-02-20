@@ -97,20 +97,18 @@ class SeaceScraperCompleto:
         logger.info("📄 Página cargada")
         sleep(2)  # Reducido de 3 a 2
         
-        logger.info("🔖 Seleccionando pestaña...")
-        sleep(10)  # Dar más tiempo al JS de PrimeFaces
-        
+        logger.info("🔖 Seleccionando pestaña 'Buscador de Procedimientos'...")
         try:
-            # Esperar más tiempo y verificar que el elemento realmente existe
-            tab_link = WebDriverWait(self.driver, 20).until(
-                EC.element_to_be_clickable((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
+            tab_link = WebDriverWait(self.driver, 10).until(
+                EC.presence_of_element_located((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
             )
+            self.driver.execute_script("arguments[0].scrollIntoView(true);", tab_link)
+            sleep(0.5)
             self.driver.execute_script("arguments[0].click();", tab_link)
             sleep(2)
             logger.info("   ✓ Pestaña seleccionada")
         except TimeoutException:
-            # Debug: imprimir el HTML actual para ver qué hay
-            logger.error("❌ Tab no encontrado. HTML actual:")
+            logger.error("❌ No se pudo seleccionar la pestaña")
             logger.error(self.driver.page_source[:3000])
             return False
         
