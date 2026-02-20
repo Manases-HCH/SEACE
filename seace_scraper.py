@@ -87,45 +87,6 @@ class SeaceScraperCompleto:
         self.driver.execute_script("arguments[0].dispatchEvent(new Event('change'));", elem)
         sleep(0.2)  # Reducido de 0.3
 
-    def _click_pestana_buscador(self, timeout: int = 15):
-        """Hace clic en la pestaña 'Buscador de Procedimientos de Selección' con múltiples estrategias"""
-        
-        estrategias = [
-            # 1. XPath original
-            (By.XPATH, '//a[@href="#tbBuscador:tab1"]'),
-            # 2. Por texto del enlace (más robusto)
-            (By.LINK_TEXT, 'Buscador de Procedimientos de Selección'),
-            # 3. Por texto parcial
-            (By.PARTIAL_LINK_TEXT, 'Buscador de Procedimientos'),
-            # 4. CSS con colon escapado
-            (By.CSS_SELECTOR, 'a[href="#tbBuscador\\:tab1"]'),
-            # 5. Por rol de tab + texto
-            (By.XPATH, '//li[@role="tab"]//a[contains(text(),"Buscador")]'),
-        ]
-        
-        for by, selector in estrategias:
-            try:
-                elem = WebDriverWait(self.driver, timeout).until(
-                    EC.element_to_be_clickable((by, selector))
-                )
-                self.driver.execute_script("arguments[0].scrollIntoView(true);", elem)
-                sleep(0.3)
-                self.driver.execute_script("arguments[0].click();", elem)
-                logger.info(f"   ✅ Pestaña clickeada con: {by}='{selector}'")
-                return
-            except (TimeoutException, NoSuchElementException):
-                logger.warning(f"   ⚠️  Estrategia fallida: {by}='{selector}'")
-                continue
-        
-        # Último recurso: JavaScript directo por href
-        try:
-            self.driver.execute_script(
-                "document.querySelector('a[href=\"#tbBuscador:tab1\"]').click();"
-            )
-            logger.info("   ✅ Pestaña clickeada con JS directo")
-        except Exception as e:
-            raise Exception(f"❌ No se pudo hacer clic en la pestaña buscador: {e}")
-    
     def buscar_y_extraer(self, fecha_inicio: datetime, fecha_fin: datetime):
         """Ejecuta la búsqueda y extrae los datos"""
         
@@ -136,10 +97,22 @@ class SeaceScraperCompleto:
         logger.info("📄 Página cargada")
         sleep(2)  # Reducido de 3 a 2
         
-        # Pestaña correcta
         logger.info("🔖 Seleccionando pestaña...")
-        self._click_pestana_buscador()
-        sleep(1)
+        sleep(10)  # Dar más tiempo al JS de PrimeFaces
+        
+        try:
+            # Esperar más tiempo y verificar que el elemento realmente existe
+            tab_link = WebDriverWait(self.driver, 20).until(
+                EC.element_to_be_clickable((By.XPATH, '//a[@href="#tbBuscador:tab1"]'))
+            )
+            self.driver.execute_script("arguments[0].click();", tab_link)
+            sleep(2)
+            logger.info("   ✓ Pestaña seleccionada")
+        except TimeoutException:
+            # Debug: imprimir el HTML actual para ver qué hay
+            logger.error("❌ Tab no encontrado. HTML actual:")
+            logger.error(self.driver.page_source[:3000])
+            return False
         
         # Búsqueda avanzada
         logger.info("🔽 Abriendo búsqueda avanzada...")
